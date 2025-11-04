@@ -16,5 +16,31 @@ Assumption
 6. Assume that our system will decide the channel of each event type and configuration is already stored in db. We can have backoffice in the future.
 7. Assume that user will have a chance to get duplicate notification. allow duplicated notifications
 8. We can configure channel for each event in runtime but for message that is in notification topic we can't change since we already validate the request payload in api level already. I don't want to increase complexity of the system
+9. We ignore high priority notification for now (we can add it later by adding priority field in notification event and let splitter worker handle it)
 
 
+Prometheus Metrics
+1. provider api call (success rate/ latency)
+2. circuit breaker status
+3. notfication api (request per minutes / latency / sucess rate)
+4. kafka (kafka success rate per topic/ response time per topic)
+5. database latency / success rate
+7. dlq message count / processing rate
+9. worker processing time / success rate
+
+Infra Metrics
+1. cpu / memory / disk / network for each service
+2. Kafka lag for each topic consumer group
+3. Database connections / cpu / memory / disk / network
+4. API gateway latency / success rate
+
+Unit test coverage
+line 90%
+branch 89.5%
+yarn test:cov
+
+Integration test
+yarn test:e2e
+
+Load test
+yarn test:load
