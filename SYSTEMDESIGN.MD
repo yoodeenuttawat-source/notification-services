@@ -10,26 +10,26 @@ This document describes the system design for the Notification Services applicat
 
 ## Data Flow
 
-1. **Internal Service Requests**: Internal services (chat, order, etc.) call the notification API to send notifications for specific event types. The supported events are:
-   - Chat message
-   - Purchase
-   - Payment reminder
-   - Shipping update
+1. **Internal Service Requests**: Internal services (chat, order, etc.) call the notification API to send notifications for specific event types. The supported events and their channel mappings are:
+   - **CHAT_MESSAGE**: PUSH ✅, EMAIL ✅
+   - **PURCHASE**: PUSH ✅, EMAIL ✅
+   - **PAYMENT_REMINDER**: PUSH ✅, EMAIL ❌
+   - **SHIPPING_UPDATE**: PUSH ✅, EMAIL ❌
 
 2. **Notification API Processing**:
    - Validates the body payload
    - Gets the available channels for the event type
    - Selects template based on database configuration
-   - Substitutes data into templates
-   - Publishes event to `notification` topic and `delivery_logs`
+   - Substitutes data into templates (pre-renders templates for all channels)
+   - Publishes event to `notification` topic with all pre-rendered templates
 
 3. **Splitter Worker**:
    - Consumes messages from `notification` topic
-   - Checks for message duplication (skips if duplicated)
-   - Processes message normally if not duplicated
-   - Splits message based on supported channels (email, push)
-   - Publishes to `notification.email` and `notification.push` topics
-   - Publishes each channel event to `delivery_logs`
+   - Checks for message duplication using LRU cache (skips if duplicated)
+   - Marks message as processed to prevent duplicates (TTL: 2 minutes)
+   - Validates message has rendered templates
+   - Splits message: For each pre-rendered template, publishes individual `ChannelMessage` to respective channel topic (`notification.email` or `notification.push`)
+   - Publishes delivery logs for each channel routing action
 
 4. **Channel Workers (Email & Push)**:
    - Consume messages from their respective topics
@@ -39,9 +39,10 @@ This document describes the system design for the Notification Services applicat
    - Send status updates to `delivery_logs`
 
 5. **Error Handling**:
-   - If any worker fails to process a message, messages are categorized into:
-     - **Retryable**: Published to DLQ (Dead Letter Queue)
-     - **Non-retryable**: Same handling but not sent to DLQ
+   - If any worker fails to process a message:
+     - **Retryable errors** (e.g., network failures, provider timeouts): Published to DLQ for retry
+     - **Non-retryable errors** (e.g., invalid data, missing required fields): Published to DLQ with metadata indicating no retry, and delivery log is updated with failure status
+   - Each worker publishes delivery logs with error details for tracking
 
 6. **Kafka Connector**:
    - Subscribes to all topics to build tables from events
@@ -173,41 +174,45 @@ yarn test:load
 
 ### Services
 
-- **Notification API**: REST API endpoint for receiving notification requests
-- **Splitter Worker**: Routes messages to appropriate channels
-- **Email Worker**: Processes email notifications
-- **Push Worker**: Processes push notifications
-- **DLQ Replay Worker**: Replays messages from Dead Letter Queue
+- **Notification API**: REST API endpoint for receiving notification requests, validates payloads, renders templates, and publishes to Kafka
+- **Splitter Worker**: Consumes from `notification` topic, deduplicates messages, and routes pre-rendered templates to channel-specific topics
+- **Email Worker**: Consumes from `notification.email` topic, handles provider failover for email notifications
+- **Push Worker**: Consumes from `notification.push` topic, handles provider failover for push notifications
+- **DLQ Replay Worker**: Replays messages from Dead Letter Queue topics for retry
 
 ### Key Technologies
 
 - **NestJS**: Framework for building scalable Node.js applications
-- **PostgreSQL**: Database for configuration and event storage
-- **Kafka**: Event streaming platform for message processing
-- **Circuit Breaker**: Prevents cascading failures
-- **LRU Cache**: In-memory caching for configuration data
+- **PostgreSQL**: Database for configuration (templates, events, channels, providers) and event storage via Kafka connector
+- **Kafka**: Event streaming platform for message processing and event sourcing
+- **Circuit Breaker**: Prevents cascading failures when calling external providers
+- **LRU Cache**: In-memory caching with concurrent access support for:
+  - Configuration data (templates, events, channels, providers) - refreshed periodically
+  - Message deduplication (TTL: 2 minutes per notification)
 
 ### Data Flow Diagram
 
 ```
 Internal Services
     ↓
-Notification API (Validates & Templates)
+Notification API (Validates Payload, Renders Templates)
     ↓
-Kafka Topic: notification
+Kafka Topic: notification (with pre-rendered templates)
     ↓
-Splitter Worker (Deduplication & Channel Routing)
+Splitter Worker (Deduplication via LRU Cache & Channel Routing)
     ↓
-Kafka Topics: notification.email, notification.push
+Kafka Topics: notification.email, notification.push (individual ChannelMessages)
     ↓
-Email Worker / Push Worker (Provider Failover)
+Email Worker / Push Worker (Provider Failover with Circuit Breaker)
     ↓
 External Providers (Email/Push Services)
     ↓
-Kafka Topics: delivery_logs, provider_request_response
+Kafka Topics:
+    - delivery_logs (all stages: routing, provider calls, failures)
+    - provider_request_response (detailed provider API interactions)
     ↓
 Kafka Connector (Event Sourcing)
     ↓
-Database Tables
+PostgreSQL Database Tables
 ```
 
