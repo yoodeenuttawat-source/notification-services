@@ -1,0 +1,213 @@
+# System Design
+
+## Overview
+
+This document describes the system design for the Notification Services application, including data flow, architecture assumptions, and monitoring metrics.
+
+## System Architecture Diagram
+
+![System Design](./SystemDesign.png)
+
+## Data Flow
+
+1. **Internal Service Requests**: Internal services (chat, order, etc.) call the notification API to send notifications for specific event types. The supported events are:
+   - Chat message
+   - Purchase
+   - Payment reminder
+   - Shipping update
+
+2. **Notification API Processing**:
+   - Validates the body payload
+   - Gets the available channels for the event type
+   - Selects template based on database configuration
+   - Substitutes data into templates
+   - Publishes event to `notification` topic and `delivery_logs`
+
+3. **Splitter Worker**:
+   - Consumes messages from `notification` topic
+   - Checks for message duplication (skips if duplicated)
+   - Processes message normally if not duplicated
+   - Splits message based on supported channels (email, push)
+   - Publishes to `notification.email` and `notification.push` topics
+   - Publishes each channel event to `delivery_logs`
+
+4. **Channel Workers (Email & Push)**:
+   - Consume messages from their respective topics
+   - Get list of available providers sorted by priority
+   - Call provider APIs in priority order (failover to next if first fails)
+   - Publish events to `provider_request_response` topic for each API call
+   - Send status updates to `delivery_logs`
+
+5. **Error Handling**:
+   - If any worker fails to process a message, messages are categorized into:
+     - **Retryable**: Published to DLQ (Dead Letter Queue)
+     - **Non-retryable**: Same handling but not sent to DLQ
+
+6. **Kafka Connector**:
+   - Subscribes to all topics to build tables from events
+   - Provides event sourcing and data persistence
+
+## Assumptions
+
+1. **Scalability & Reliability**:
+   - System needs to handle **100k notifications per minute** (1667 notifications per second)
+   - Focus on reliability
+   - Two options considered: Outbox pattern vs Event Sourcing
+   - **Decision: Event Sourcing** - Chosen because the bottleneck will be Kafka, which supports high throughput. Outbox pattern has limitations on database.
+
+2. **Provider Idempotency**:
+   - All providers support idempotent keys
+   - Can retry multiple times without worrying about duplicate notifications to users
+
+3. **Provider Response**:
+   - Providers respond with 'sent' status instantly
+   - No need to handle webhooks/callbacks
+
+4. **Status Tracking**:
+   - Ignore 'read' and 'click' status to reduce scope
+
+5. **Device Tokens**:
+   - Don't need to send device tokens for each push provider (can be added later with one API call)
+
+6. **Channel Configuration**:
+   - System decides the channel for each event type
+   - Configuration is stored in database
+   - Backoffice can be added in the future
+
+7. **Duplicate Notifications**:
+   - System allows duplicated notifications
+   - Users may receive duplicate notifications
+
+8. **Runtime Configuration**:
+   - Channel configuration for each event can be changed at runtime
+   - For messages already in `notification` topic, channel configuration cannot be changed (already validated at API level)
+   - This design choice avoids increasing system complexity
+
+9. **Priority Handling**:
+   - High priority notifications are ignored for now
+   - Can be added later by:
+     - Adding priority field to notification event
+     - Letting splitter worker handle priority routing
+
+## Monitoring Metrics
+
+### Prometheus Metrics
+
+1. **Provider API Metrics**:
+   - Success rate
+   - Latency
+
+2. **Circuit Breaker Metrics**:
+   - Circuit breaker status
+
+3. **Notification API Metrics**:
+   - Requests per minute
+   - Latency
+   - Success rate
+
+4. **Kafka Metrics**:
+   - Success rate per topic
+   - Response time per topic
+
+5. **Database Metrics**:
+   - Latency
+   - Success rate
+
+6. **DLQ Metrics**:
+   - DLQ message count
+   - Processing rate
+
+7. **Worker Metrics**:
+   - Processing time
+   - Success rate
+
+### Infrastructure Metrics
+
+1. **Service Metrics**:
+   - CPU usage
+   - Memory usage
+   - Disk usage
+   - Network usage
+
+2. **Kafka Metrics**:
+   - Kafka lag for each topic consumer group
+
+3. **Database Metrics**:
+   - Connection count
+   - CPU usage
+   - Memory usage
+   - Disk usage
+   - Network usage
+
+4. **API Gateway Metrics**:
+   - Latency
+   - Success rate
+
+## Testing
+
+### Unit Test Coverage
+
+- **Line Coverage**: 90%
+- **Branch Coverage**: 89.5%
+
+**Command:**
+```bash
+yarn test:cov
+```
+
+### Integration Test
+
+**Command:**
+```bash
+yarn test:e2e
+```
+
+### Load Test
+
+**Command:**
+```bash
+yarn test:load
+```
+
+## Architecture Components
+
+### Services
+
+- **Notification API**: REST API endpoint for receiving notification requests
+- **Splitter Worker**: Routes messages to appropriate channels
+- **Email Worker**: Processes email notifications
+- **Push Worker**: Processes push notifications
+- **DLQ Replay Worker**: Replays messages from Dead Letter Queue
+
+### Key Technologies
+
+- **NestJS**: Framework for building scalable Node.js applications
+- **PostgreSQL**: Database for configuration and event storage
+- **Kafka**: Event streaming platform for message processing
+- **Circuit Breaker**: Prevents cascading failures
+- **LRU Cache**: In-memory caching for configuration data
+
+### Data Flow Diagram
+
+```
+Internal Services
+    ↓
+Notification API (Validates & Templates)
+    ↓
+Kafka Topic: notification
+    ↓
+Splitter Worker (Deduplication & Channel Routing)
+    ↓
+Kafka Topics: notification.email, notification.push
+    ↓
+Email Worker / Push Worker (Provider Failover)
+    ↓
+External Providers (Email/Push Services)
+    ↓
+Kafka Topics: delivery_logs, provider_request_response
+    ↓
+Kafka Connector (Event Sourcing)
+    ↓
+Database Tables
+```
+
