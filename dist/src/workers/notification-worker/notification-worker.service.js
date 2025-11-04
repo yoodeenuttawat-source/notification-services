@@ -15,10 +15,13 @@ const common_1 = require("@nestjs/common");
 const kafka_service_1 = require("../../kafka/kafka.service");
 const kafka_config_1 = require("../../kafka/kafka.config");
 const error_classifier_1 = require("../../kafka/utils/error-classifier");
+const cache_service_1 = require("../../cache/cache.service");
 let NotificationWorkerService = NotificationWorkerService_1 = class NotificationWorkerService {
-    constructor(kafkaService) {
+    constructor(kafkaService, cacheService) {
         this.kafkaService = kafkaService;
+        this.cacheService = cacheService;
         this.logger = new common_1.Logger(NotificationWorkerService_1.name);
+        this.DEDUP_TTL_SECONDS = 120;
     }
     async onModuleInit() {
         this.logger.log('Initializing notification worker...');
@@ -52,6 +55,11 @@ let NotificationWorkerService = NotificationWorkerService_1 = class Notification
                 });
                 return;
             }
+            if (this.isDuplicate(message.notification_id)) {
+                this.logger.warn(`Duplicate notification detected, skipping: ${message.notification_id}`);
+                return;
+            }
+            this.markAsProcessed(message.notification_id);
             this.logger.log(`Processing notification: ${message.notification_id}`);
             if (!message.rendered_templates || message.rendered_templates.length === 0) {
                 this.logger.warn(`No rendered templates found for notification: ${message.notification_id}`);
@@ -210,10 +218,20 @@ let NotificationWorkerService = NotificationWorkerService_1 = class Notification
             this.logger.error('Failed to send message to DLQ:', dlqError);
         }
     }
+    isDuplicate(notificationId) {
+        const cacheKey = `dedup:notification:${notificationId}`;
+        const cached = this.cacheService.get(cacheKey);
+        return cached === true;
+    }
+    markAsProcessed(notificationId) {
+        const cacheKey = `dedup:notification:${notificationId}`;
+        this.cacheService.set(cacheKey, true, this.DEDUP_TTL_SECONDS);
+    }
 };
 exports.NotificationWorkerService = NotificationWorkerService;
 exports.NotificationWorkerService = NotificationWorkerService = NotificationWorkerService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [kafka_service_1.KafkaService])
+    __metadata("design:paramtypes", [kafka_service_1.KafkaService,
+        cache_service_1.CacheService])
 ], NotificationWorkerService);
 //# sourceMappingURL=notification-worker.service.js.map

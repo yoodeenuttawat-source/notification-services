@@ -16,13 +16,15 @@ const kafka_service_1 = require("../../kafka/kafka.service");
 const config_service_1 = require("../../cache/config.service");
 const provider_factory_service_1 = require("../../providers/provider-factory.service");
 const kafka_config_1 = require("../../kafka/kafka.config");
-const error_classifier_1 = require("../../kafka/utils/error-classifier");
+const cache_service_1 = require("../../cache/cache.service");
 let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService {
-    constructor(kafkaService, configService, providerFactory) {
+    constructor(kafkaService, configService, providerFactory, cacheService) {
         this.kafkaService = kafkaService;
         this.configService = configService;
         this.providerFactory = providerFactory;
+        this.cacheService = cacheService;
         this.logger = new common_1.Logger(EmailWorkerService_1.name);
+        this.DEDUP_TTL_SECONDS = 120;
     }
     async onModuleInit() {
         this.logger.log('Initializing email worker...');
@@ -40,11 +42,16 @@ let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService {
             const message = await this.parseMessage(originalMessage);
             if (!message)
                 return;
+            if (this.isDuplicate(message.notification_id)) {
+                this.logger.warn(`Duplicate email notification detected, skipping: ${message.notification_id}`);
+                return;
+            }
+            this.markAsProcessed(message.notification_id);
             if (!await this.validateEmailMessage(message))
                 return;
             const providers = await this.getProviders(message.channel_id);
             if (!providers || providers.length === 0) {
-                await this.handleNoProviders(message);
+                await this.handleNoProviders(message, originalMessage, payload.message.key?.toString());
                 return;
             }
             const result = await this.trySendNotification(message, providers);
@@ -103,7 +110,7 @@ let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService {
             return null;
         }
     }
-    async handleNoProviders(message) {
+    async handleNoProviders(message, originalMessage, originalKey) {
         this.logger.warn(`No providers found for channel_id: ${message.channel_id}`);
         await this.publishDeliveryLog({
             notification_id: message.notification_id,
@@ -115,6 +122,7 @@ let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService {
             status: 'failed',
             error_message: 'No providers available - configuration issue',
         });
+        await this.sendToDLQ(originalMessage, kafka_config_1.KAFKA_TOPICS.EMAIL_NOTIFICATION, originalKey, Error('No providers available - configuration issue'), message.notification_id);
     }
     async trySendNotification(message, providers) {
         this.logger.log(`Processing email notification: ${message.notification_id}`);
@@ -159,9 +167,7 @@ let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService {
             status: 'failed',
             error_message: error?.message || 'Non-retriable error: All providers failed',
         });
-        if (error && error_classifier_1.ErrorClassifier.isRetriable(error)) {
-            await this.sendToDLQ(originalMessage, kafka_config_1.KAFKA_TOPICS.EMAIL_NOTIFICATION, originalKey, error, message.notification_id);
-        }
+        await this.sendToDLQ(originalMessage, kafka_config_1.KAFKA_TOPICS.EMAIL_NOTIFICATION, originalKey, error, message.notification_id);
     }
     async handleProcessingError(originalMessage, originalKey, error) {
         this.logger.error('Error processing email notification:', error);
@@ -176,9 +182,6 @@ let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService {
             status: 'failed',
             error_message: errorObj.message
         });
-        if (error_classifier_1.ErrorClassifier.isRetriable(errorObj)) {
-            await this.sendToDLQ(originalMessage, kafka_config_1.KAFKA_TOPICS.EMAIL_NOTIFICATION, originalKey, errorObj, undefined);
-        }
     }
     async publishDeliveryLog(log) {
         const deliveryLog = {
@@ -224,12 +227,22 @@ let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService {
             this.logger.error('Failed to send message to DLQ:', dlqError);
         }
     }
+    isDuplicate(notificationId) {
+        const cacheKey = `dedup:email:${notificationId}`;
+        const cached = this.cacheService.get(cacheKey);
+        return cached === true;
+    }
+    markAsProcessed(notificationId) {
+        const cacheKey = `dedup:email:${notificationId}`;
+        this.cacheService.set(cacheKey, true, this.DEDUP_TTL_SECONDS);
+    }
 };
 exports.EmailWorkerService = EmailWorkerService;
 exports.EmailWorkerService = EmailWorkerService = EmailWorkerService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [kafka_service_1.KafkaService,
         config_service_1.ConfigService,
-        provider_factory_service_1.ProviderFactoryService])
+        provider_factory_service_1.ProviderFactoryService,
+        cache_service_1.CacheService])
 ], EmailWorkerService);
 //# sourceMappingURL=email-worker.service.js.map

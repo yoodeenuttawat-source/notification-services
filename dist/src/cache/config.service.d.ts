@@ -30,6 +30,7 @@ export declare class ConfigService implements OnModuleInit {
     private readonly CACHE_KEYS;
     constructor(databaseService: DatabaseService, cacheService: CacheService);
     onModuleInit(): Promise<void>;
+    refreshCachePeriodically(): Promise<void>;
     refreshCache(): Promise<void>;
     private cacheTemplates;
     private cacheEventChannelMappings;

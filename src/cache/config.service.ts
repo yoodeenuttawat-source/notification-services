@@ -44,14 +44,27 @@ export class ConfigService implements OnModuleInit {
     private readonly cacheService: CacheService
   ) {}
 
-  async onModuleInit() {
+  async onModuleInit() { try {
     await this.refreshCache();
+  } catch (error) {
+    this.logger.error('Failed to initialize configuration cache:', error);
+    throw error;
+  }
   }
 
   /**
    * Refresh cache every 5 minutes
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
+  async refreshCachePeriodically() {
+    try {
+      await this.refreshCache();
+    } catch (error) {
+      this.logger.error('Failed to refresh cache periodically:', error);
+    }
+  }
+
+
   async refreshCache() {
     this.logger.log('Refreshing configuration cache...');
     try {
@@ -65,6 +78,7 @@ export class ConfigService implements OnModuleInit {
       this.logger.log('Configuration cache refreshed successfully');
     } catch (error) {
       this.logger.error('Failed to refresh cache:', error);
+      throw error;
     }
   }
 
@@ -79,7 +93,8 @@ export class ConfigService implements OnModuleInit {
       templatesByEventChannel.set(key, template);
     }
 
-    await this.cacheService.set(this.CACHE_KEYS.TEMPLATES, Object.fromEntries(templatesByEventChannel), 300);
+    this.cacheService.set(this.CACHE_KEYS.TEMPLATES, Object.fromEntries(templatesByEventChannel), 300);
+    this.logger.log(`Cached ${templatesByEventChannel.size} templates`);
   }
 
   private async cacheEventChannelMappings() {
@@ -95,11 +110,12 @@ export class ConfigService implements OnModuleInit {
       mappingsByEvent.get(mapping.event_id)!.push(mapping);
     }
 
-    await this.cacheService.set(
+    this.cacheService.set(
       this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS,
       Object.fromEntries(mappingsByEvent),
       300
     );
+    this.logger.log(`Refresh Cached ${mappingsByEvent.size} event channel mappings`);
   }
 
   private async cacheProviders() {
@@ -115,11 +131,12 @@ export class ConfigService implements OnModuleInit {
       providersByChannel.get(provider.channel_id)!.push(provider);
     }
 
-    await this.cacheService.set(
+    this.cacheService.set(
       this.CACHE_KEYS.PROVIDERS,
       Object.fromEntries(providersByChannel),
       300
     );
+    this.logger.log(`Cached ${providersByChannel.size} providers`);
   }
 
   private async cacheEvents() {
@@ -132,7 +149,8 @@ export class ConfigService implements OnModuleInit {
       eventsMap.set(event.event_id, event.name);
     }
 
-    await this.cacheService.set(this.CACHE_KEYS.EVENTS, Object.fromEntries(eventsMap), 300);
+    this.cacheService.set(this.CACHE_KEYS.EVENTS, Object.fromEntries(eventsMap), 300);
+    this.logger.log(`Cached ${eventsMap.size} events`);
   }
 
   private async cacheChannels() {
@@ -145,11 +163,12 @@ export class ConfigService implements OnModuleInit {
       channelsMap.set(channel.channel_id, channel.channel);
     }
 
-    await this.cacheService.set(this.CACHE_KEYS.CHANNELS, Object.fromEntries(channelsMap), 300);
+    this.cacheService.set(this.CACHE_KEYS.CHANNELS, Object.fromEntries(channelsMap), 300);
+    this.logger.log(`Cached ${channelsMap.size} channels`);
   }
 
   async getTemplate(eventId: number, channelId: number): Promise<TemplateCache | null> {
-    const cached = await this.cacheService.get<Record<string, TemplateCache>>(this.CACHE_KEYS.TEMPLATES);
+    const cached = this.cacheService.get<Record<string, TemplateCache>>(this.CACHE_KEYS.TEMPLATES);
     if (cached) {
       const key = `${eventId}:${channelId}`;
       return cached[key] || null;
@@ -167,7 +186,7 @@ export class ConfigService implements OnModuleInit {
   }
 
   async getEventChannelMappings(eventId: number): Promise<EventChannelMappingCache[]> {
-    const cached = await this.cacheService.get<Record<number, EventChannelMappingCache[]>>(
+    const cached = this.cacheService.get<Record<number, EventChannelMappingCache[]>>(
       this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS
     );
     if (cached && cached[eventId]) {
@@ -183,7 +202,7 @@ export class ConfigService implements OnModuleInit {
   }
 
   async getProvidersByChannel(channelId: number): Promise<ProviderCache[]> {
-    const cached = await this.cacheService.get<Record<number, ProviderCache[]>>(this.CACHE_KEYS.PROVIDERS);
+    const cached = this.cacheService.get<Record<number, ProviderCache[]>>(this.CACHE_KEYS.PROVIDERS);
     if (cached && cached[channelId]) {
       return cached[channelId];
     }
@@ -197,7 +216,7 @@ export class ConfigService implements OnModuleInit {
   }
 
   async getEventInfoByName(eventName: string): Promise<{ eventId: number; eventName: string } | null> {
-    const cached = await this.cacheService.get<Record<number, string>>(this.CACHE_KEYS.EVENTS);
+    const cached = this.cacheService.get<Record<number, string>>(this.CACHE_KEYS.EVENTS);
     if (cached) {
       // Find event_id by searching through cached events
       const entry = Object.entries(cached).find(([_, name]) => name === eventName);

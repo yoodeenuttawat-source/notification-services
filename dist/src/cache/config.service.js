@@ -29,7 +29,21 @@ let ConfigService = ConfigService_1 = class ConfigService {
         };
     }
     async onModuleInit() {
-        await this.refreshCache();
+        try {
+            await this.refreshCache();
+        }
+        catch (error) {
+            this.logger.error('Failed to initialize configuration cache:', error);
+            throw error;
+        }
+    }
+    async refreshCachePeriodically() {
+        try {
+            await this.refreshCache();
+        }
+        catch (error) {
+            this.logger.error('Failed to refresh cache periodically:', error);
+        }
     }
     async refreshCache() {
         this.logger.log('Refreshing configuration cache...');
@@ -45,6 +59,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         }
         catch (error) {
             this.logger.error('Failed to refresh cache:', error);
+            throw error;
         }
     }
     async cacheTemplates() {
@@ -54,7 +69,8 @@ let ConfigService = ConfigService_1 = class ConfigService {
             const key = `${template.event_id}:${template.channel_id}`;
             templatesByEventChannel.set(key, template);
         }
-        await this.cacheService.set(this.CACHE_KEYS.TEMPLATES, Object.fromEntries(templatesByEventChannel), 300);
+        this.cacheService.set(this.CACHE_KEYS.TEMPLATES, Object.fromEntries(templatesByEventChannel), 300);
+        this.logger.log(`Cached ${templatesByEventChannel.size} templates`);
     }
     async cacheEventChannelMappings() {
         const result = await this.databaseService.callProcedure('get_all_event_channel_mappings');
@@ -65,7 +81,8 @@ let ConfigService = ConfigService_1 = class ConfigService {
             }
             mappingsByEvent.get(mapping.event_id).push(mapping);
         }
-        await this.cacheService.set(this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS, Object.fromEntries(mappingsByEvent), 300);
+        this.cacheService.set(this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS, Object.fromEntries(mappingsByEvent), 300);
+        this.logger.log(`Refresh Cached ${mappingsByEvent.size} event channel mappings`);
     }
     async cacheProviders() {
         const result = await this.databaseService.callProcedure('get_all_providers');
@@ -76,7 +93,8 @@ let ConfigService = ConfigService_1 = class ConfigService {
             }
             providersByChannel.get(provider.channel_id).push(provider);
         }
-        await this.cacheService.set(this.CACHE_KEYS.PROVIDERS, Object.fromEntries(providersByChannel), 300);
+        this.cacheService.set(this.CACHE_KEYS.PROVIDERS, Object.fromEntries(providersByChannel), 300);
+        this.logger.log(`Cached ${providersByChannel.size} providers`);
     }
     async cacheEvents() {
         const result = await this.databaseService.callProcedure('get_all_events');
@@ -84,7 +102,8 @@ let ConfigService = ConfigService_1 = class ConfigService {
         for (const event of result.rows) {
             eventsMap.set(event.event_id, event.name);
         }
-        await this.cacheService.set(this.CACHE_KEYS.EVENTS, Object.fromEntries(eventsMap), 300);
+        this.cacheService.set(this.CACHE_KEYS.EVENTS, Object.fromEntries(eventsMap), 300);
+        this.logger.log(`Cached ${eventsMap.size} events`);
     }
     async cacheChannels() {
         const result = await this.databaseService.callProcedure('get_all_channels');
@@ -92,10 +111,11 @@ let ConfigService = ConfigService_1 = class ConfigService {
         for (const channel of result.rows) {
             channelsMap.set(channel.channel_id, channel.channel);
         }
-        await this.cacheService.set(this.CACHE_KEYS.CHANNELS, Object.fromEntries(channelsMap), 300);
+        this.cacheService.set(this.CACHE_KEYS.CHANNELS, Object.fromEntries(channelsMap), 300);
+        this.logger.log(`Cached ${channelsMap.size} channels`);
     }
     async getTemplate(eventId, channelId) {
-        const cached = await this.cacheService.get(this.CACHE_KEYS.TEMPLATES);
+        const cached = this.cacheService.get(this.CACHE_KEYS.TEMPLATES);
         if (cached) {
             const key = `${eventId}:${channelId}`;
             return cached[key] || null;
@@ -105,7 +125,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         return template || null;
     }
     async getEventChannelMappings(eventId) {
-        const cached = await this.cacheService.get(this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS);
+        const cached = this.cacheService.get(this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS);
         if (cached && cached[eventId]) {
             return cached[eventId];
         }
@@ -113,7 +133,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         return result.rows.filter(m => m.event_id === eventId);
     }
     async getProvidersByChannel(channelId) {
-        const cached = await this.cacheService.get(this.CACHE_KEYS.PROVIDERS);
+        const cached = this.cacheService.get(this.CACHE_KEYS.PROVIDERS);
         if (cached && cached[channelId]) {
             return cached[channelId];
         }
@@ -121,7 +141,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         return result.rows.filter(p => p.channel_id === channelId);
     }
     async getEventInfoByName(eventName) {
-        const cached = await this.cacheService.get(this.CACHE_KEYS.EVENTS);
+        const cached = this.cacheService.get(this.CACHE_KEYS.EVENTS);
         if (cached) {
             const entry = Object.entries(cached).find(([_, name]) => name === eventName);
             if (entry) {
@@ -143,7 +163,7 @@ __decorate([
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
-], ConfigService.prototype, "refreshCache", null);
+], ConfigService.prototype, "refreshCachePeriodically", null);
 exports.ConfigService = ConfigService = ConfigService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [database_service_1.DatabaseService,

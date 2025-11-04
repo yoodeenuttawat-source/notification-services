@@ -2,12 +2,15 @@ import { OnModuleInit } from '@nestjs/common';
 import { KafkaService } from '../../kafka/kafka.service';
 import { ConfigService } from '../../cache/config.service';
 import { ProviderFactoryService } from '../../providers/provider-factory.service';
+import { CacheService } from '../../cache/cache.service';
 export declare class PushWorkerService implements OnModuleInit {
     private readonly kafkaService;
     private readonly configService;
     private readonly providerFactory;
+    private readonly cacheService;
     private readonly logger;
-    constructor(kafkaService: KafkaService, configService: ConfigService, providerFactory: ProviderFactoryService);
+    private readonly DEDUP_TTL_SECONDS;
+    constructor(kafkaService: KafkaService, configService: ConfigService, providerFactory: ProviderFactoryService, cacheService: CacheService);
     onModuleInit(): Promise<void>;
     private processPushNotification;
     private parseMessage;
@@ -18,4 +21,6 @@ export declare class PushWorkerService implements OnModuleInit {
     private handleProcessingError;
     private publishDeliveryLog;
     private sendToDLQ;
+    private isDuplicate;
+    private markAsProcessed;
 }

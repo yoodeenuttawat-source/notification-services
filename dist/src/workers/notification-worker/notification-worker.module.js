@@ -10,12 +10,13 @@ exports.NotificationWorkerModule = void 0;
 const common_1 = require("@nestjs/common");
 const notification_worker_service_1 = require("./notification-worker.service");
 const kafka_module_1 = require("../../kafka/kafka.module");
+const cache_module_1 = require("../../cache/cache.module");
 let NotificationWorkerModule = class NotificationWorkerModule {
 };
 exports.NotificationWorkerModule = NotificationWorkerModule;
 exports.NotificationWorkerModule = NotificationWorkerModule = __decorate([
     (0, common_1.Module)({
-        imports: [kafka_module_1.KafkaModule],
+        imports: [kafka_module_1.KafkaModule, cache_module_1.CacheModule],
         providers: [notification_worker_service_1.NotificationWorkerService]
     })
 ], NotificationWorkerModule);

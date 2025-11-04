@@ -6,13 +6,16 @@ import { ChannelMessage } from '../../kafka/types/channel-message';
 import { DeliveryLog } from '../../kafka/types/delivery-log';
 import { DLQMessage } from '../../kafka/types/dlq-message';
 import { ErrorClassifier } from '../../kafka/utils/error-classifier';
+import { CacheService } from '../../cache/cache.service';
 
 @Injectable()
 export class NotificationWorkerService implements OnModuleInit {
   private readonly logger = new Logger(NotificationWorkerService.name);
+  private readonly DEDUP_TTL_SECONDS = 120; // 2 minutes
 
   constructor(
-    private readonly kafkaService: KafkaService
+    private readonly kafkaService: KafkaService,
+    private readonly cacheService: CacheService
   ) {}
 
   async onModuleInit() {
@@ -58,6 +61,15 @@ export class NotificationWorkerService implements OnModuleInit {
         // Message will be committed (acknowledged) - no DLQ for non-retriable errors
         return;
       }
+
+      // Check for duplicate message
+      if (this.isDuplicate(message.notification_id)) {
+        this.logger.warn(`Duplicate notification detected, skipping: ${message.notification_id}`);
+        return; // Skip processing duplicate message
+      }
+
+      // Mark as processed to prevent duplicates
+      this.markAsProcessed(message.notification_id);
 
       this.logger.log(`Processing notification: ${message.notification_id}`);
 
@@ -267,5 +279,22 @@ export class NotificationWorkerService implements OnModuleInit {
       this.logger.error('Failed to send message to DLQ:', dlqError);
       // Don't throw - we don't want DLQ failures to crash the worker
     }
+  }
+
+  /**
+   * Check if notification has been processed recently (deduplication)
+   */
+  private isDuplicate(notificationId: string): boolean {
+    const cacheKey = `dedup:notification:${notificationId}`;
+    const cached = this.cacheService.get<boolean>(cacheKey);
+    return cached === true;
+  }
+
+  /**
+   * Mark notification as processed to prevent duplicates
+   */
+  private markAsProcessed(notificationId: string): void {
+    const cacheKey = `dedup:notification:${notificationId}`;
+    this.cacheService.set(cacheKey, true, this.DEDUP_TTL_SECONDS);
   }
 }

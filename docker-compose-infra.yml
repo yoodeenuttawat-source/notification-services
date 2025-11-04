@@ -19,20 +19,6 @@ services:
     networks:
       - notifications-network
 
-  redis:
-    image: redis:7-alpine
-    container_name: notif_redis
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - notifications-network
-
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
     container_name: notif_zookeeper
