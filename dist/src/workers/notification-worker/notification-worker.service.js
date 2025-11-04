@@ -37,9 +37,7 @@ let NotificationWorkerService = NotificationWorkerService_1 = class Notification
                 this.logger.warn(`No rendered templates found for notification: ${message.notification_id}`);
                 return;
             }
-            for (const renderedTemplate of message.rendered_templates) {
-                await this.routeToChannel(message, renderedTemplate);
-            }
+            await Promise.all(message.rendered_templates.map(renderedTemplate => this.routeToChannel(message, renderedTemplate)));
         }
         catch (error) {
             this.logger.error('Error processing notification:', error);

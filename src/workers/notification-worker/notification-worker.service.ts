@@ -40,10 +40,12 @@ export class NotificationWorkerService implements OnModuleInit {
         return;
       }
 
-      // Route each rendered template to its channel topic
-      for (const renderedTemplate of message.rendered_templates) {
-        await this.routeToChannel(message, renderedTemplate);
-      }
+      // Route each rendered template to its channel topic concurrently
+      await Promise.all(
+        message.rendered_templates.map(renderedTemplate =>
+          this.routeToChannel(message, renderedTemplate)
+        )
+      );
     } catch (error) {
       this.logger.error('Error processing notification:', error);
       throw error;
