@@ -138,7 +138,7 @@ For detailed e2e test setup and troubleshooting, see [src/test/README.md](src/te
 # Run all tests (unit + e2e)
 npm run test:all
 
-# Run with coverage (unit tests only)
+# Run with coverage currently minimum threshold's set to 90% (unit tests only)
 npm run test:cov
 
 # Run in watch mode (unit tests only)
