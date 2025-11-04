@@ -12,18 +12,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProviderFactoryService = void 0;
 const common_1 = require("@nestjs/common");
 const CircuitBreakerService_1 = require("../circuit-breaker/CircuitBreakerService");
+const kafka_service_1 = require("../kafka/kafka.service");
 const push_provider1_service_1 = require("./push/push-provider1.service");
 const push_provider2_service_1 = require("./push/push-provider2.service");
 const email_provider1_service_1 = require("./email/email-provider1.service");
 const email_provider2_service_1 = require("./email/email-provider2.service");
 let ProviderFactoryService = class ProviderFactoryService {
-    constructor(circuitBreakerService) {
+    constructor(circuitBreakerService, kafkaService) {
         this.circuitBreakerService = circuitBreakerService;
+        this.kafkaService = kafkaService;
         this.providers = new Map();
-        this.providers.set('PushProvider1', new push_provider1_service_1.PushProviderService1(this.circuitBreakerService));
-        this.providers.set('PushProvider2', new push_provider2_service_1.PushProviderService2(this.circuitBreakerService));
-        this.providers.set('EmailProvider1', new email_provider1_service_1.EmailProviderService1(this.circuitBreakerService));
-        this.providers.set('EmailProvider2', new email_provider2_service_1.EmailProviderService2(this.circuitBreakerService));
+        this.providers.set('PushProvider1', new push_provider1_service_1.PushProviderService1(this.circuitBreakerService, this.kafkaService));
+        this.providers.set('PushProvider2', new push_provider2_service_1.PushProviderService2(this.circuitBreakerService, this.kafkaService));
+        this.providers.set('EmailProvider1', new email_provider1_service_1.EmailProviderService1(this.circuitBreakerService, this.kafkaService));
+        this.providers.set('EmailProvider2', new email_provider2_service_1.EmailProviderService2(this.circuitBreakerService, this.kafkaService));
     }
     getProvider(name) {
         return this.providers.get(name);
@@ -35,6 +37,7 @@ let ProviderFactoryService = class ProviderFactoryService {
 exports.ProviderFactoryService = ProviderFactoryService;
 exports.ProviderFactoryService = ProviderFactoryService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [CircuitBreakerService_1.CircuitBreakerService])
+    __metadata("design:paramtypes", [CircuitBreakerService_1.CircuitBreakerService,
+        kafka_service_1.KafkaService])
 ], ProviderFactoryService);
 //# sourceMappingURL=provider-factory.service.js.map

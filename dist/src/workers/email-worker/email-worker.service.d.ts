@@ -10,5 +10,13 @@ export declare class EmailWorkerService implements OnModuleInit {
     constructor(kafkaService: KafkaService, configService: ConfigService, providerFactory: ProviderFactoryService);
     onModuleInit(): Promise<void>;
     private processEmailNotification;
+    private parseMessage;
+    private validateEmailMessage;
+    private getProviders;
+    private handleNoProviders;
+    private trySendNotification;
+    private handleAllProvidersFailed;
+    private handleProcessingError;
     private publishDeliveryLog;
+    private sendToDLQ;
 }

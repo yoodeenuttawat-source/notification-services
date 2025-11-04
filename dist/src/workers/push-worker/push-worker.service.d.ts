@@ -10,5 +10,12 @@ export declare class PushWorkerService implements OnModuleInit {
     constructor(kafkaService: KafkaService, configService: ConfigService, providerFactory: ProviderFactoryService);
     onModuleInit(): Promise<void>;
     private processPushNotification;
+    private parseMessage;
+    private getProviders;
+    private handleNoProviders;
+    private trySendNotification;
+    private handleAllProvidersFailed;
+    private handleProcessingError;
     private publishDeliveryLog;
+    private sendToDLQ;
 }

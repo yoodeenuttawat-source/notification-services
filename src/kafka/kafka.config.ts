@@ -26,5 +26,10 @@ export const KAFKA_TOPICS = {
   NOTIFICATION: 'notification',
   PUSH_NOTIFICATION: 'notification.push',
   EMAIL_NOTIFICATION: 'notification.email',
-  DELIVERY_LOGS: 'delivery_logs'
+  DELIVERY_LOGS: 'delivery_logs',
+  PROVIDER_RESPONSE: 'provider_request_response',
+  // Dead Letter Queues
+  NOTIFICATION_DLQ: 'notification.dlq',
+  PUSH_NOTIFICATION_DLQ: 'notification.push.dlq',
+  EMAIL_NOTIFICATION_DLQ: 'notification.email.dlq'
 } as const;

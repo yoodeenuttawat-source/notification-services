@@ -9,4 +9,5 @@ export declare class NotificationWorkerService implements OnModuleInit {
     private routeToChannel;
     private getChannelTopic;
     private publishDeliveryLog;
+    private sendToDLQ;
 }

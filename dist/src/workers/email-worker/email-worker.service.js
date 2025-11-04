@@ -16,7 +16,7 @@ const kafka_service_1 = require("../../kafka/kafka.service");
 const config_service_1 = require("../../cache/config.service");
 const provider_factory_service_1 = require("../../providers/provider-factory.service");
 const kafka_config_1 = require("../../kafka/kafka.config");
-const CircuitBreakerOpenError_1 = require("../../circuit-breaker/CircuitBreakerOpenError");
+const error_classifier_1 = require("../../kafka/utils/error-classifier");
 let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService {
     constructor(kafkaService, configService, providerFactory) {
         this.kafkaService = kafkaService;
@@ -35,116 +35,149 @@ let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService {
         this.logger.log('Email worker started and ready to process messages');
     }
     async processEmailNotification(payload) {
+        const originalMessage = payload.message.value.toString();
         try {
-            const message = JSON.parse(payload.message.value.toString());
-            this.logger.log(`Processing email notification: ${message.notification_id}`);
-            if (!message.template_subject) {
-                this.logger.warn(`Email notification ${message.notification_id} missing subject`);
-                await this.publishDeliveryLog({
-                    notification_id: message.notification_id,
-                    event_id: message.event_id,
-                    event_name: message.event_name,
-                    channel_id: message.channel_id,
-                    channel_name: message.channel_name,
-                    stage: 'provider_called',
-                    status: 'failed',
-                    error_message: 'Email subject is required'
-                });
+            const message = await this.parseMessage(originalMessage);
+            if (!message)
+                return;
+            if (!await this.validateEmailMessage(message))
+                return;
+            const providers = await this.getProviders(message.channel_id);
+            if (!providers || providers.length === 0) {
+                await this.handleNoProviders(message);
                 return;
             }
-            const providers = await this.configService.getProvidersByChannel(message.channel_id);
-            if (providers.length === 0) {
-                this.logger.warn(`No providers found for channel_id: ${message.channel_id}`);
-                await this.publishDeliveryLog({
-                    notification_id: message.notification_id,
-                    event_id: message.event_id,
-                    event_name: message.event_name,
-                    channel_id: message.channel_id,
-                    channel_name: message.channel_name,
-                    stage: 'provider_called',
-                    status: 'failed',
-                    error_message: 'No providers available'
-                });
-                return;
-            }
-            let success = false;
-            let lastError = null;
-            for (const providerConfig of providers) {
-                try {
-                    const provider = this.providerFactory.getProvider(providerConfig.name);
-                    if (!provider) {
-                        this.logger.warn(`Provider ${providerConfig.name} not found in factory`);
-                        continue;
-                    }
-                    await this.publishDeliveryLog({
-                        notification_id: message.notification_id,
-                        event_id: message.event_id,
-                        event_name: message.event_name,
-                        channel_id: message.channel_id,
-                        channel_name: message.channel_name,
-                        provider_name: providerConfig.name,
-                        stage: 'provider_called',
-                        status: 'pending'
-                    });
-                    const result = await provider.sendNotification({
-                        recipient: message.recipient,
-                        subject: message.template_subject,
-                        content: message.template_content,
-                        metadata: message.metadata
-                    });
-                    await this.publishDeliveryLog({
-                        notification_id: message.notification_id,
-                        event_id: message.event_id,
-                        event_name: message.event_name,
-                        channel_id: message.channel_id,
-                        channel_name: message.channel_name,
-                        provider_name: providerConfig.name,
-                        stage: 'provider_success',
-                        status: 'success',
-                        message_id: result.messageId
-                    });
-                    this.logger.log(`Email notification ${message.notification_id} sent via ${providerConfig.name}`);
-                    success = true;
-                    break;
-                }
-                catch (error) {
-                    lastError = error instanceof Error ? error : new Error(String(error));
-                    if (error instanceof CircuitBreakerOpenError_1.CircuitBreakerOpenError) {
-                        await this.publishDeliveryLog({
-                            notification_id: message.notification_id,
-                            event_id: message.event_id,
-                            event_name: message.event_name,
-                            channel_id: message.channel_id,
-                            channel_name: message.channel_name,
-                            provider_name: providerConfig.name,
-                            stage: 'circuit_breaker_open',
-                            status: 'failed',
-                            error_message: lastError.message
-                        });
-                        this.logger.warn(`Circuit breaker open for ${providerConfig.name}, trying next provider`);
-                        continue;
-                    }
-                    await this.publishDeliveryLog({
-                        notification_id: message.notification_id,
-                        event_id: message.event_id,
-                        event_name: message.event_name,
-                        channel_id: message.channel_id,
-                        channel_name: message.channel_name,
-                        provider_name: providerConfig.name,
-                        stage: 'provider_failed',
-                        status: 'failed',
-                        error_message: lastError.message
-                    });
-                    this.logger.error(`Provider ${providerConfig.name} failed:`, lastError);
-                }
-            }
-            if (!success) {
-                this.logger.error(`All email providers failed for notification ${message.notification_id}:`, lastError);
+            const result = await this.trySendNotification(message, providers);
+            if (!result.success) {
+                await this.handleAllProvidersFailed(originalMessage, payload.message.key?.toString(), message, result.error);
             }
         }
         catch (error) {
-            this.logger.error('Error processing email notification:', error);
-            throw error;
+            this.logger.error('Unexpected error in email notification processing:', error);
+            await this.handleProcessingError(originalMessage, payload.message.key?.toString(), error);
+        }
+    }
+    async parseMessage(originalMessage) {
+        try {
+            return JSON.parse(originalMessage);
+        }
+        catch (parseError) {
+            const parseErr = parseError instanceof Error ? parseError : new Error(String(parseError));
+            this.logger.error('JSON parse error (non-retriable):', parseErr);
+            await this.publishDeliveryLog({
+                notification_id: 'unknown',
+                event_id: 0,
+                event_name: 'unknown',
+                channel_id: 0,
+                channel_name: 'EMAIL',
+                stage: 'processing_failed',
+                status: 'failed',
+                error_message: `Invalid JSON message format: ${parseErr.message}`,
+            });
+            return null;
+        }
+    }
+    async validateEmailMessage(message) {
+        if (!message.template_subject) {
+            this.logger.warn(`Email notification ${message.notification_id} missing subject`);
+            await this.publishDeliveryLog({
+                notification_id: message.notification_id,
+                event_id: message.event_id,
+                event_name: message.event_name,
+                channel_id: message.channel_id,
+                channel_name: message.channel_name,
+                stage: 'provider_called',
+                status: 'failed',
+                error_message: 'Email subject is required - invalid message data',
+            });
+            return false;
+        }
+        return true;
+    }
+    async getProviders(channelId) {
+        try {
+            return await this.configService.getProvidersByChannel(channelId);
+        }
+        catch (error) {
+            this.logger.error(`Error getting providers for channel_id ${channelId}:`, error);
+            return null;
+        }
+    }
+    async handleNoProviders(message) {
+        this.logger.warn(`No providers found for channel_id: ${message.channel_id}`);
+        await this.publishDeliveryLog({
+            notification_id: message.notification_id,
+            event_id: message.event_id,
+            event_name: message.event_name,
+            channel_id: message.channel_id,
+            channel_name: message.channel_name,
+            stage: 'provider_called',
+            status: 'failed',
+            error_message: 'No providers available - configuration issue',
+        });
+    }
+    async trySendNotification(message, providers) {
+        this.logger.log(`Processing email notification: ${message.notification_id}`);
+        for (const providerConfig of providers) {
+            const provider = this.providerFactory.getProvider(providerConfig.name);
+            if (!provider) {
+                this.logger.warn(`Provider ${providerConfig.name} not found in factory`);
+                continue;
+            }
+            try {
+                await provider.sendNotification({
+                    recipient: message.recipient,
+                    subject: message.template_subject,
+                    content: message.template_content,
+                    metadata: message.metadata,
+                    context: {
+                        notification_id: message.notification_id,
+                        event_id: message.event_id,
+                        event_name: message.event_name,
+                        channel_id: message.channel_id,
+                        channel_name: message.channel_name,
+                    }
+                });
+                this.logger.log(`Email notification ${message.notification_id} sent via ${providerConfig.name}`);
+                return { success: true, error: null };
+            }
+            catch (providerError) {
+                continue;
+            }
+        }
+        return { success: false, error: new Error('All providers failed') };
+    }
+    async handleAllProvidersFailed(originalMessage, originalKey, message, error) {
+        this.logger.error(`All email providers failed for notification ${message.notification_id}:`, error);
+        await this.publishDeliveryLog({
+            notification_id: message.notification_id,
+            event_id: message.event_id,
+            event_name: message.event_name,
+            channel_id: message.channel_id,
+            channel_name: message.channel_name,
+            stage: 'provider_failed',
+            status: 'failed',
+            error_message: error?.message || 'Non-retriable error: All providers failed',
+        });
+        if (error && error_classifier_1.ErrorClassifier.isRetriable(error)) {
+            await this.sendToDLQ(originalMessage, kafka_config_1.KAFKA_TOPICS.EMAIL_NOTIFICATION, originalKey, error, message.notification_id);
+        }
+    }
+    async handleProcessingError(originalMessage, originalKey, error) {
+        this.logger.error('Error processing email notification:', error);
+        const errorObj = error instanceof Error ? error : new Error(String(error));
+        await this.publishDeliveryLog({
+            notification_id: 'unknown',
+            event_id: 0,
+            event_name: 'unknown',
+            channel_id: 0,
+            channel_name: 'EMAIL',
+            stage: 'processing_failed',
+            status: 'failed',
+            error_message: errorObj.message
+        });
+        if (error_classifier_1.ErrorClassifier.isRetriable(errorObj)) {
+            await this.sendToDLQ(originalMessage, kafka_config_1.KAFKA_TOPICS.EMAIL_NOTIFICATION, originalKey, errorObj, undefined);
         }
     }
     async publishDeliveryLog(log) {
@@ -158,6 +191,38 @@ let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService {
                 value: deliveryLog
             }
         ]);
+    }
+    async sendToDLQ(originalMessage, originalTopic, originalKey, error, notificationId) {
+        try {
+            const errorObj = error instanceof Error ? error : new Error(String(error));
+            const dlqMessage = {
+                originalMessage: JSON.parse(originalMessage),
+                originalTopic,
+                originalKey,
+                error: {
+                    message: errorObj.message,
+                    stack: errorObj.stack,
+                    type: errorObj.constructor.name
+                },
+                retryCount: 0,
+                maxRetries: 0,
+                timestamp: new Date().toISOString(),
+                metadata: {
+                    notification_id: notificationId,
+                    channel_name: 'EMAIL'
+                }
+            };
+            await this.kafkaService.publishMessage(kafka_config_1.KAFKA_TOPICS.EMAIL_NOTIFICATION_DLQ, [
+                {
+                    key: notificationId || originalKey,
+                    value: dlqMessage
+                }
+            ]);
+            this.logger.warn(`Sent message to DLQ: ${kafka_config_1.KAFKA_TOPICS.EMAIL_NOTIFICATION_DLQ}, notification_id: ${notificationId}`);
+        }
+        catch (dlqError) {
+            this.logger.error('Failed to send message to DLQ:', dlqError);
+        }
     }
 };
 exports.EmailWorkerService = EmailWorkerService;

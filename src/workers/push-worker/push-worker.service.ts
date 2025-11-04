@@ -6,6 +6,9 @@ import { KAFKA_TOPICS } from '../../kafka/kafka.config';
 import { ChannelMessage } from '../../kafka/types/channel-message';
 import { DeliveryLog } from '../../kafka/types/delivery-log';
 import { CircuitBreakerOpenError } from '../../circuit-breaker/CircuitBreakerOpenError';
+import { DLQMessage } from '../../kafka/types/dlq-message';
+import { ErrorClassifier } from '../../kafka/utils/error-classifier';
+import { EachMessagePayload } from 'kafkajs';
 
 @Injectable()
 export class PushWorkerService implements OnModuleInit {
@@ -34,127 +37,189 @@ export class PushWorkerService implements OnModuleInit {
     this.logger.log('Push worker started and ready to process messages');
   }
 
-  private async processPushNotification(payload: any) {
+  private async processPushNotification(payload: EachMessagePayload) {
+    const originalMessage = payload.message.value.toString();
+    
     try {
-      const message: ChannelMessage = JSON.parse(payload.message.value.toString());
-      this.logger.log(`Processing push notification: ${message.notification_id}`);
+      // Parse and validate message
+      const message = await this.parseMessage(originalMessage);
+      if (!message) return;
 
-      // Get providers for push channel
-      const providers = await this.configService.getProvidersByChannel(message.channel_id);
-
-      if (providers.length === 0) {
-        this.logger.warn(`No providers found for channel_id: ${message.channel_id}`);
-        await this.publishDeliveryLog({
-          notification_id: message.notification_id,
-          event_id: message.event_id,
-          event_name: message.event_name,
-          channel_id: message.channel_id,
-          channel_name: message.channel_name,
-          stage: 'provider_called',
-          status: 'failed',
-          error_message: 'No providers available'
-        });
+      // Get providers and validate
+      const providers = await this.getProviders(message.channel_id);
+      if (!providers || providers.length === 0) {
+        await this.handleNoProviders(message);
         return;
       }
 
-      // Try providers in priority order
-      let success = false;
-      let lastError: Error | null = null;
-
-      for (const providerConfig of providers) {
-        try {
-          const provider = this.providerFactory.getProvider(providerConfig.name);
-          if (!provider) {
-            this.logger.warn(`Provider ${providerConfig.name} not found in factory`);
-            continue;
-          }
-
-          // Log provider call attempt
-          await this.publishDeliveryLog({
-            notification_id: message.notification_id,
-            event_id: message.event_id,
-            event_name: message.event_name,
-            channel_id: message.channel_id,
-            channel_name: message.channel_name,
-            provider_name: providerConfig.name,
-            stage: 'provider_called',
-            status: 'pending'
-          });
-
-          const result = await provider.sendNotification({
-            recipient: message.recipient,
-            subject: message.template_subject,
-            content: message.template_content,
-            metadata: message.metadata
-          });
-
-          // Success
-          await this.publishDeliveryLog({
-            notification_id: message.notification_id,
-            event_id: message.event_id,
-            event_name: message.event_name,
-            channel_id: message.channel_id,
-            channel_name: message.channel_name,
-            provider_name: providerConfig.name,
-            stage: 'provider_success',
-            status: 'success',
-            message_id: result.messageId
-          });
-
-          this.logger.log(
-            `Push notification ${message.notification_id} sent via ${providerConfig.name}`
-          );
-          success = true;
-          break;
-        } catch (error) {
-          lastError = error instanceof Error ? error : new Error(String(error));
-
-          if (error instanceof CircuitBreakerOpenError) {
-            await this.publishDeliveryLog({
-              notification_id: message.notification_id,
-              event_id: message.event_id,
-              event_name: message.event_name,
-              channel_id: message.channel_id,
-              channel_name: message.channel_name,
-              provider_name: providerConfig.name,
-              stage: 'circuit_breaker_open',
-              status: 'failed',
-              error_message: lastError.message
-            });
-
-            this.logger.warn(
-              `Circuit breaker open for ${providerConfig.name}, trying next provider`
-            );
-            continue;
-          }
-
-          // Other errors
-          await this.publishDeliveryLog({
-            notification_id: message.notification_id,
-            event_id: message.event_id,
-            event_name: message.event_name,
-            channel_id: message.channel_id,
-            channel_name: message.channel_name,
-            provider_name: providerConfig.name,
-            stage: 'provider_failed',
-            status: 'failed',
-            error_message: lastError.message
-          });
-
-          this.logger.error(`Provider ${providerConfig.name} failed:`, lastError);
-          // Continue to next provider
-        }
-      }
-
-      if (!success) {
-        this.logger.error(
-          `All push providers failed for notification ${message.notification_id}:`,
-          lastError
+      // Try to send notification via providers
+      const result = await this.trySendNotification(message, providers);
+      
+      // Handle failure if all providers failed
+      if (!result.success) {
+        await this.handleAllProvidersFailed(
+          originalMessage,
+          payload.message.key?.toString(),
+          message,
+          result.error
         );
       }
     } catch (error) {
-      this.logger.error('Error processing push notification:', error);
-      throw error;
+      this.logger.error('Unexpected error in push notification processing:', error);
+      await this.handleProcessingError(
+        originalMessage,
+        payload.message.key?.toString(),
+        error
+      );
+    }
+  }
+
+  private async parseMessage(originalMessage: string): Promise<ChannelMessage | null> {
+    try {
+      return JSON.parse(originalMessage);
+    } catch (parseError) {
+      const parseErr = parseError instanceof Error ? parseError : new Error(String(parseError));
+      this.logger.error('JSON parse error (non-retriable):', parseErr);
+      
+      await this.publishDeliveryLog({
+        notification_id: 'unknown',
+        event_id: 0,
+        event_name: 'unknown',
+        channel_id: 0,
+        channel_name: 'PUSH',
+        stage: 'processing_failed',
+        status: 'failed',
+        error_message: `Invalid JSON message format: ${parseErr.message}`,
+      });
+      return null;
+    }
+  }
+
+  private async getProviders(channelId: number) {
+    try {
+      return await this.configService.getProvidersByChannel(channelId);
+    } catch (error) {
+      this.logger.error(`Error getting providers for channel_id ${channelId}:`, error);
+      return null;
+    }
+  }
+
+  private async handleNoProviders(message: ChannelMessage): Promise<void> {
+    this.logger.warn(`No providers found for channel_id: ${message.channel_id}`);
+    await this.publishDeliveryLog({
+      notification_id: message.notification_id,
+      event_id: message.event_id,
+      event_name: message.event_name,
+      channel_id: message.channel_id,
+      channel_name: message.channel_name,
+      stage: 'provider_called',
+      status: 'failed',
+      error_message: 'No providers available - configuration issue',
+    });
+
+  }
+
+  private async trySendNotification(
+    message: ChannelMessage,
+    providers: Array<{ name: string; priority: number }>
+  ): Promise<{ success: boolean; error: Error | null }> {
+    this.logger.log(`Processing push notification: ${message.notification_id}`);
+
+    for (const providerConfig of providers) {
+      const provider = this.providerFactory.getProvider(providerConfig.name);
+      if (!provider) {
+        this.logger.warn(`Provider ${providerConfig.name} not found in factory`);
+        continue;
+      }
+
+      try {
+        await provider.sendNotification({
+          recipient: message.recipient,
+          subject: message.template_subject,
+          content: message.template_content,
+          metadata: message.metadata,
+          context: {
+            notification_id: message.notification_id,
+            event_id: message.event_id,
+            event_name: message.event_name,
+            channel_id: message.channel_id,
+            channel_name: message.channel_name,
+          }
+        });
+
+        this.logger.log(
+          `Push notification ${message.notification_id} sent via ${providerConfig.name}`
+        );
+        return { success: true, error: null };
+      } catch (providerError) {
+        // Continue to next provider
+        continue;
+      }
+    }
+
+    return { success: false, error: new Error('All providers failed') };
+  }
+
+  private async handleAllProvidersFailed(
+    originalMessage: string,
+    originalKey: string | undefined,
+    message: ChannelMessage,
+    error: Error | null
+  ): Promise<void> {
+    this.logger.error(
+      `All push providers failed for notification ${message.notification_id}:`,
+      error
+    );
+
+    await this.publishDeliveryLog({
+      notification_id: message.notification_id,
+      event_id: message.event_id,
+      event_name: message.event_name,
+      channel_id: message.channel_id,
+      channel_name: message.channel_name,
+      stage: 'provider_failed',
+      status: 'failed',
+      error_message: error?.message || 'Non-retriable error: All providers failed',
+    });
+    if (error && ErrorClassifier.isRetriable(error)) {
+      await this.sendToDLQ(
+        originalMessage,
+        KAFKA_TOPICS.PUSH_NOTIFICATION,
+        originalKey,
+        error,
+        message.notification_id
+      );
+    }
+  }
+
+  private async handleProcessingError(
+    originalMessage: string,
+    originalKey: string | undefined,
+    error: unknown
+  ): Promise<void> {
+    this.logger.error('Error processing push notification:', error);
+    
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+
+    await this.publishDeliveryLog({
+      notification_id: 'unknown',
+      event_id: 0,
+      event_name: 'unknown',
+      channel_id: 0,
+      channel_name: 'PUSH',
+      stage: 'processing_failed',
+      status: 'failed',
+      error_message: errorObj.message
+    });
+
+    if (ErrorClassifier.isRetriable(errorObj)) {
+      await this.sendToDLQ(
+        originalMessage,
+        KAFKA_TOPICS.PUSH_NOTIFICATION,
+        originalKey,
+        errorObj,
+        undefined
+      );
     }
   }
 
@@ -170,5 +235,47 @@ export class PushWorkerService implements OnModuleInit {
         value: deliveryLog
       }
     ]);
+  }
+
+  private async sendToDLQ(
+    originalMessage: string,
+    originalTopic: string,
+    originalKey: string | undefined,
+    error: unknown,
+    notificationId?: string
+  ): Promise<void> {
+    try {
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      
+      const dlqMessage: DLQMessage = {
+        originalMessage: JSON.parse(originalMessage),
+        originalTopic,
+        originalKey,
+        error: {
+          message: errorObj.message,
+          stack: errorObj.stack,
+          type: errorObj.constructor.name
+        },
+        retryCount: 0,
+        maxRetries: 0,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          notification_id: notificationId,
+          channel_name: 'PUSH'
+        }
+      };
+
+      await this.kafkaService.publishMessage(KAFKA_TOPICS.PUSH_NOTIFICATION_DLQ, [
+        {
+          key: notificationId || originalKey,
+          value: dlqMessage
+        }
+      ]);
+
+      this.logger.warn(`Sent message to DLQ: ${KAFKA_TOPICS.PUSH_NOTIFICATION_DLQ}, notification_id: ${notificationId}`);
+    } catch (dlqError) {
+      this.logger.error('Failed to send message to DLQ:', dlqError);
+      // Don't throw - we don't want DLQ failures to crash the worker
+    }
   }
 }

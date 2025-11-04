@@ -4,6 +4,8 @@ import { KAFKA_TOPICS } from '../../kafka/kafka.config';
 import { NotificationMessage } from '../../kafka/types/notification-message';
 import { ChannelMessage } from '../../kafka/types/channel-message';
 import { DeliveryLog } from '../../kafka/types/delivery-log';
+import { DLQMessage } from '../../kafka/types/dlq-message';
+import { ErrorClassifier } from '../../kafka/utils/error-classifier';
 
 @Injectable()
 export class NotificationWorkerService implements OnModuleInit {
@@ -31,24 +33,113 @@ export class NotificationWorkerService implements OnModuleInit {
   }
 
   private async processNotification(payload: any) {
-    try {
-      const message: NotificationMessage = JSON.parse(payload.message.value.toString());
-      this.logger.log(`Processing notification: ${message.notification_id}`);
+    const originalMessage = payload.message.value.toString();
+    let message: NotificationMessage;
+    
 
-      if (!message.rendered_templates || message.rendered_templates.length === 0) {
-        this.logger.warn(`No rendered templates found for notification: ${message.notification_id}`);
+    try {
+      try {
+        message = JSON.parse(originalMessage);
+      } catch (parseError) {
+        // JSON parse error is non-retriable - commit message and log failure
+        const parseErr = parseError instanceof Error ? parseError : new Error(String(parseError));
+        this.logger.error('JSON parse error (non-retriable):', parseErr);
+        
+        await this.publishDeliveryLog({
+          notification_id: 'unknown',
+          event_id: 0,
+          event_name: 'unknown',
+          channel_id: 0,
+          channel_name: 'unknown',
+          stage: 'processing_failed',
+          status: 'failed',
+          error_message: `Invalid JSON message format: ${parseErr.message}`,
+        });
+        // Message will be committed (acknowledged) - no DLQ for non-retriable errors
         return;
       }
 
+      this.logger.log(`Processing notification: ${message.notification_id}`);
+
+      if (!message.rendered_templates || message.rendered_templates.length === 0) {
+        // No templates is non-retriable (invalid data) - commit and log
+        this.logger.warn(`No rendered templates found for notification: ${message.notification_id}`);
+        await this.publishDeliveryLog({
+          notification_id: message.notification_id,
+          event_id: message.event_id,
+          event_name: message.event_name,
+          channel_id: 0,
+          channel_name: 'unknown',
+          stage: 'processing_failed',
+          status: 'failed',
+          error_message: 'No rendered templates found - invalid message data',
+        });
+        return; // Commit message, no DLQ
+      }
+
       // Route each rendered template to its channel topic concurrently
-      await Promise.all(
-        message.rendered_templates.map(renderedTemplate =>
-          this.routeToChannel(message, renderedTemplate)
-        )
-      );
+      try {
+        await Promise.all(
+          message.rendered_templates.map(renderedTemplate =>
+            this.routeToChannel(message, renderedTemplate)
+          )
+        );
+      } catch (routeError) {
+        // Check if error is retriable
+        const errorObj = routeError instanceof Error ? routeError : new Error(String(routeError));
+        if (ErrorClassifier.isRetriable(errorObj)) {
+          // Retriable error - send to DLQ
+          await this.sendToDLQ(
+            originalMessage,
+            KAFKA_TOPICS.NOTIFICATION,
+            payload.message.key?.toString(),
+            errorObj,
+            message.notification_id
+          );
+        } else {
+          // Non-retriable error - commit and log (no DLQ)
+          await this.publishDeliveryLog({
+            notification_id: message.notification_id,
+            event_id: message.event_id,
+            event_name: message.event_name,
+            channel_id: 0,
+            channel_name: 'unknown',
+            stage: 'processing_failed',
+            status: 'failed',
+            error_message: errorObj.message,
+          });
+          // Message will be committed (acknowledged)
+        }
+      }
     } catch (error) {
       this.logger.error('Error processing notification:', error);
-      throw error;
+      
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      
+      // Check if error is retriable
+      if (ErrorClassifier.isRetriable(errorObj)) {
+        // Retriable error - send to DLQ for replay
+        await this.sendToDLQ(
+          originalMessage,
+          KAFKA_TOPICS.NOTIFICATION,
+          payload.message.key?.toString(),
+          errorObj,
+          message?.notification_id
+        );
+      } else {
+        // Non-retriable error - commit message and log failure (no DLQ)
+        await this.publishDeliveryLog({
+          notification_id: message?.notification_id || 'unknown',
+          event_id: message?.event_id || 0,
+          event_name: message?.event_name || 'unknown',
+          channel_id: 0,
+          channel_name: 'unknown',
+          stage: 'processing_failed',
+          status: 'failed',
+          error_message: errorObj.message,
+        });
+        // Message will be committed (acknowledged) - no DLQ
+      }
     }
   }
 
@@ -90,7 +181,7 @@ export class NotificationWorkerService implements OnModuleInit {
         channel_id: renderedTemplate.channel_id,
         channel_name: renderedTemplate.channel_name,
         stage: 'routed',
-        status: 'pending'
+        status: 'pending',
       });
 
       this.logger.log(
@@ -107,7 +198,7 @@ export class NotificationWorkerService implements OnModuleInit {
         channel_name: renderedTemplate.channel_name,
         stage: 'routed',
         status: 'failed',
-        error_message: error instanceof Error ? error.message : 'Unknown error'
+        error_message: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
@@ -135,5 +226,46 @@ export class NotificationWorkerService implements OnModuleInit {
         value: deliveryLog
       }
     ]);
+  }
+
+  private async sendToDLQ(
+    originalMessage: string,
+    originalTopic: string,
+    originalKey: string | undefined,
+    error: unknown,
+    notificationId?: string
+  ): Promise<void> {
+    try {
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      
+      const dlqMessage: DLQMessage = {
+        originalMessage: JSON.parse(originalMessage),
+        originalTopic,
+        originalKey,
+        error: {
+          message: errorObj.message,
+          stack: errorObj.stack,
+          type: errorObj.constructor.name
+        },
+        retryCount: 0,
+        maxRetries: 0,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          notification_id: notificationId
+        }
+      };
+
+      await this.kafkaService.publishMessage(KAFKA_TOPICS.NOTIFICATION_DLQ, [
+        {
+          key: notificationId || originalKey,
+          value: dlqMessage
+        }
+      ]);
+
+      this.logger.warn(`Sent message to DLQ: ${KAFKA_TOPICS.NOTIFICATION_DLQ}, notification_id: ${notificationId}`);
+    } catch (dlqError) {
+      this.logger.error('Failed to send message to DLQ:', dlqError);
+      // Don't throw - we don't want DLQ failures to crash the worker
+    }
   }
 }

@@ -76,3 +76,54 @@ yarn call-api SHIPPING_UPDATE
   - Push worker (processes push notifications)
   - Email worker (processes email notifications)
 
+## replay-dlq.ts
+
+A script to manually replay messages from Dead Letter Queues (DLQ).
+
+### Usage
+
+```bash
+# Using yarn
+yarn replay-dlq <DLQ_TOPIC> [LIMIT]
+
+# Using npm
+npm run replay-dlq <DLQ_TOPIC> [LIMIT]
+
+# Using ts-node directly
+ts-node scripts/replay-dlq.ts <DLQ_TOPIC> [LIMIT]
+```
+
+### Available DLQ Topics
+
+- `notification.dlq` - Failed messages from notification worker
+- `notification.push.dlq` - Failed messages from push worker
+- `notification.email.dlq` - Failed messages from email worker
+
+### Examples
+
+```bash
+# Replay all messages from notification DLQ
+yarn replay-dlq notification.dlq
+
+# Replay first 10 messages from push DLQ
+yarn replay-dlq notification.push.dlq 10
+
+# Replay first 5 messages from email DLQ
+yarn replay-dlq notification.email.dlq 5
+```
+
+### How It Works
+
+1. Connects to Kafka and creates a consumer for the specified DLQ topic
+2. Reads messages from the beginning of the DLQ topic
+3. Extracts the original message from each DLQ message
+4. Republishes the original message to its original topic
+5. Provides summary of processed, replayed, and failed messages
+
+### Notes
+
+- Messages are replayed from the beginning of the DLQ topic
+- Use `LIMIT` parameter to control how many messages to replay
+- Press Ctrl+C to stop gracefully
+- Failed replays are logged but don't stop the process
+

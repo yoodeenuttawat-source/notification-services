@@ -13,4 +13,8 @@ export declare const KAFKA_TOPICS: {
     readonly PUSH_NOTIFICATION: "notification.push";
     readonly EMAIL_NOTIFICATION: "notification.email";
     readonly DELIVERY_LOGS: "delivery_logs";
+    readonly PROVIDER_RESPONSE: "provider_request_response";
+    readonly NOTIFICATION_DLQ: "notification.dlq";
+    readonly PUSH_NOTIFICATION_DLQ: "notification.push.dlq";
+    readonly EMAIL_NOTIFICATION_DLQ: "notification.email.dlq";
 };
