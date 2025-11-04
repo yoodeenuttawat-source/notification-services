@@ -31,6 +31,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
     async onModuleInit() {
         try {
             await this.refreshCache();
+            this.logger.log('Configuration cache initialized successfully');
         }
         catch (error) {
             this.logger.error('Failed to initialize configuration cache:', error);
@@ -69,7 +70,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             const key = `${template.event_id}:${template.channel_id}`;
             templatesByEventChannel.set(key, template);
         }
-        this.cacheService.set(this.CACHE_KEYS.TEMPLATES, Object.fromEntries(templatesByEventChannel), 300);
+        this.cacheService.set(this.CACHE_KEYS.TEMPLATES, Object.fromEntries(templatesByEventChannel));
         this.logger.log(`Cached ${templatesByEventChannel.size} templates`);
     }
     async cacheEventChannelMappings() {
@@ -81,7 +82,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             }
             mappingsByEvent.get(mapping.event_id).push(mapping);
         }
-        this.cacheService.set(this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS, Object.fromEntries(mappingsByEvent), 300);
+        this.cacheService.set(this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS, Object.fromEntries(mappingsByEvent));
         this.logger.log(`Refresh Cached ${mappingsByEvent.size} event channel mappings`);
     }
     async cacheProviders() {
@@ -93,7 +94,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             }
             providersByChannel.get(provider.channel_id).push(provider);
         }
-        this.cacheService.set(this.CACHE_KEYS.PROVIDERS, Object.fromEntries(providersByChannel), 300);
+        this.cacheService.set(this.CACHE_KEYS.PROVIDERS, Object.fromEntries(providersByChannel));
         this.logger.log(`Cached ${providersByChannel.size} providers`);
     }
     async cacheEvents() {
@@ -102,7 +103,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         for (const event of result.rows) {
             eventsMap.set(event.event_id, event.name);
         }
-        this.cacheService.set(this.CACHE_KEYS.EVENTS, Object.fromEntries(eventsMap), 300);
+        this.cacheService.set(this.CACHE_KEYS.EVENTS, Object.fromEntries(eventsMap));
         this.logger.log(`Cached ${eventsMap.size} events`);
     }
     async cacheChannels() {
@@ -111,7 +112,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         for (const channel of result.rows) {
             channelsMap.set(channel.channel_id, channel.channel);
         }
-        this.cacheService.set(this.CACHE_KEYS.CHANNELS, Object.fromEntries(channelsMap), 300);
+        this.cacheService.set(this.CACHE_KEYS.CHANNELS, Object.fromEntries(channelsMap));
         this.logger.log(`Cached ${channelsMap.size} channels`);
     }
     async getTemplate(eventId, channelId) {

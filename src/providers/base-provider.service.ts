@@ -152,7 +152,7 @@ export abstract class BaseProviderService {
       timestamp: new Date().toISOString()
     };
 
-    await this.kafkaService.publishMessage(KAFKA_TOPICS.PROVIDER_RESPONSE, [
+    await this.kafkaService.publishMessage(KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE, [
       {
         key: response.provider_request_id,
         value: providerResponse

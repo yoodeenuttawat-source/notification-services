@@ -44,12 +44,14 @@ export class ConfigService implements OnModuleInit {
     private readonly cacheService: CacheService
   ) {}
 
-  async onModuleInit() { try {
-    await this.refreshCache();
-  } catch (error) {
-    this.logger.error('Failed to initialize configuration cache:', error);
-    throw error;
-  }
+  async onModuleInit() {
+    try {
+      await this.refreshCache();
+      this.logger.log('Configuration cache initialized successfully');
+    } catch (error) {
+      this.logger.error('Failed to initialize configuration cache:', error);
+      throw error;
+    }
   }
 
   /**
@@ -93,7 +95,7 @@ export class ConfigService implements OnModuleInit {
       templatesByEventChannel.set(key, template);
     }
 
-    this.cacheService.set(this.CACHE_KEYS.TEMPLATES, Object.fromEntries(templatesByEventChannel), 300);
+    this.cacheService.set(this.CACHE_KEYS.TEMPLATES, Object.fromEntries(templatesByEventChannel));
     this.logger.log(`Cached ${templatesByEventChannel.size} templates`);
   }
 
@@ -112,8 +114,7 @@ export class ConfigService implements OnModuleInit {
 
     this.cacheService.set(
       this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS,
-      Object.fromEntries(mappingsByEvent),
-      300
+      Object.fromEntries(mappingsByEvent)
     );
     this.logger.log(`Refresh Cached ${mappingsByEvent.size} event channel mappings`);
   }
@@ -133,8 +134,7 @@ export class ConfigService implements OnModuleInit {
 
     this.cacheService.set(
       this.CACHE_KEYS.PROVIDERS,
-      Object.fromEntries(providersByChannel),
-      300
+      Object.fromEntries(providersByChannel)
     );
     this.logger.log(`Cached ${providersByChannel.size} providers`);
   }
@@ -149,7 +149,7 @@ export class ConfigService implements OnModuleInit {
       eventsMap.set(event.event_id, event.name);
     }
 
-    this.cacheService.set(this.CACHE_KEYS.EVENTS, Object.fromEntries(eventsMap), 300);
+    this.cacheService.set(this.CACHE_KEYS.EVENTS, Object.fromEntries(eventsMap));
     this.logger.log(`Cached ${eventsMap.size} events`);
   }
 
@@ -163,7 +163,7 @@ export class ConfigService implements OnModuleInit {
       channelsMap.set(channel.channel_id, channel.channel);
     }
 
-    this.cacheService.set(this.CACHE_KEYS.CHANNELS, Object.fromEntries(channelsMap), 300);
+    this.cacheService.set(this.CACHE_KEYS.CHANNELS, Object.fromEntries(channelsMap));
     this.logger.log(`Cached ${channelsMap.size} channels`);
   }
 

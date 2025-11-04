@@ -95,7 +95,7 @@ class BaseProviderService {
             ...response,
             timestamp: new Date().toISOString()
         };
-        await this.kafkaService.publishMessage(kafka_config_1.KAFKA_TOPICS.PROVIDER_RESPONSE, [
+        await this.kafkaService.publishMessage(kafka_config_1.KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE, [
             {
                 key: response.provider_request_id,
                 value: providerResponse

@@ -1,13 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
-import { NotificationApiModule } from './notification-api.module';
-import { KafkaTestHelper } from '../test/kafka-test-helper';
-import { KAFKA_TOPICS } from '../kafka/kafka.config';
-import { NotificationMessage } from '../kafka/types/notification-message';
-import { ChannelMessage } from '../kafka/types/channel-message';
-import { DeliveryLog } from '../kafka/types/delivery-log';
-import { ProviderRequestResponse } from '../kafka/types/provider-response';
+import { NotificationApiModule } from '../../src/notification-api/notification-api.module';
+import { KafkaTestHelper } from '../../src/test/kafka-test-helper';
+import { KAFKA_TOPICS } from '../../src/kafka/kafka.config';
+import { NotificationMessage } from '../../src/kafka/types/notification-message';
+import { ChannelMessage } from '../../src/kafka/types/channel-message';
+import { DeliveryLog } from '../../src/kafka/types/delivery-log';
+import { ProviderRequestResponse } from '../../src/kafka/types/provider-response';
 
 /**
  * Integration tests for Notification API
@@ -55,7 +55,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       'test-delivery-logs-consumer'
     );
     await kafkaHelper.createConsumerForTopic(
-      KAFKA_TOPICS.PROVIDER_RESPONSE,
+      KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE,
       'test-provider-response-consumer'
     );
 
@@ -268,7 +268,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
 
       // Verify provider request/response messages for PUSH channel
       const pushProviderResponse = await kafkaHelper.waitForMessage(
-        KAFKA_TOPICS.PROVIDER_RESPONSE,
+        KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE,
         20000,
         (msg) => msg.value?.notification_id === notificationId && 
                  msg.value?.channel_name === 'PUSH'
@@ -320,7 +320,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
 
       // Verify provider request/response messages for EMAIL channel
       const emailProviderResponse = await kafkaHelper.waitForMessage(
-        KAFKA_TOPICS.PROVIDER_RESPONSE,
+        KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE,
         20000,
         (msg) => msg.value?.notification_id === notificationId && 
                  msg.value?.channel_name === 'EMAIL'

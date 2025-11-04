@@ -36,11 +36,14 @@ let CacheService = CacheService_1 = class CacheService {
         }
         return null;
     }
-    set(key, value, ttlSeconds = 300) {
+    set(key, value, ttlSeconds) {
+        const expiresAt = ttlSeconds === undefined || ttlSeconds === 0
+            ? Number.MAX_SAFE_INTEGER
+            : Date.now() + ttlSeconds * 1000;
         if (this.inMemoryCache.has(key)) {
             this.inMemoryCache.set(key, {
                 data: value,
-                expiresAt: Date.now() + ttlSeconds * 1000,
+                expiresAt: expiresAt,
                 lastAccessed: Date.now()
             });
             const entry = this.inMemoryCache.get(key);
@@ -53,7 +56,7 @@ let CacheService = CacheService_1 = class CacheService {
         }
         this.inMemoryCache.set(key, {
             data: value,
-            expiresAt: Date.now() + ttlSeconds * 1000,
+            expiresAt: expiresAt,
             lastAccessed: Date.now()
         });
     }

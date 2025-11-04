@@ -18,10 +18,12 @@
     "seed": "ts-node scripts/seed.ts",
     "call-api": "ts-node scripts/call-api.ts",
     "replay-dlq": "ts-node scripts/replay-dlq.ts",
-    "test": "jest",
+    "test": "jest --config jest.config.js",
+    "test:unit": "jest --config jest.config.js",
+    "test:e2e": "jest --config jest.e2e.config.js",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:integration": "jest --testPathPattern=integration"
+    "test:cov": "jest --config jest.config.js --coverage",
+    "test:all": "npm run test:unit && npm run test:e2e"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

@@ -20,6 +20,13 @@ let NotificationApiController = class NotificationApiController {
     constructor(notificationApiService) {
         this.notificationApiService = notificationApiService;
     }
+    health() {
+        return {
+            status: 'ok',
+            service: 'notification-api',
+            timestamp: new Date().toISOString()
+        };
+    }
     async sendNotification(dto) {
         await this.notificationApiService.sendNotification(dto);
         return {
@@ -30,6 +37,13 @@ let NotificationApiController = class NotificationApiController {
     }
 };
 exports.NotificationApiController = NotificationApiController;
+__decorate([
+    (0, common_1.Get)('health'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], NotificationApiController.prototype, "health", null);
 __decorate([
     (0, common_1.Post)('send'),
     (0, common_1.HttpCode)(common_1.HttpStatus.ACCEPTED),

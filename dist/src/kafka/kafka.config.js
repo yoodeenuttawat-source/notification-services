@@ -19,7 +19,7 @@ exports.KAFKA_TOPICS = {
     PUSH_NOTIFICATION: 'notification.push',
     EMAIL_NOTIFICATION: 'notification.email',
     DELIVERY_LOGS: 'delivery_logs',
-    PROVIDER_RESPONSE: 'provider_request_response',
+    PROVIDER_REQUEST_RESPONSE: 'provider_request_response',
     NOTIFICATION_DLQ: 'notification.dlq',
     PUSH_NOTIFICATION_DLQ: 'notification.push.dlq',
     EMAIL_NOTIFICATION_DLQ: 'notification.email.dlq'

@@ -43,12 +43,17 @@ export class CacheService implements OnModuleInit {
     return null;
   }
 
-  set(key: string, value: any, ttlSeconds: number = 300): void {
+  set(key: string, value: any, ttlSeconds?: number): void {
+    // If ttlSeconds is 0 or undefined, set expiresAt to a very large number (effectively never expires)
+    const expiresAt = ttlSeconds === undefined || ttlSeconds === 0
+      ? Number.MAX_SAFE_INTEGER
+      : Date.now() + ttlSeconds * 1000;
+
     // Check if key already exists (update case)
     if (this.inMemoryCache.has(key)) {
       this.inMemoryCache.set(key, {
         data: value,
-        expiresAt: Date.now() + ttlSeconds * 1000,
+        expiresAt: expiresAt,
         lastAccessed: Date.now()
       });
       // Move to end (most recently used)
@@ -66,7 +71,7 @@ export class CacheService implements OnModuleInit {
     // Add new entry
     this.inMemoryCache.set(key, {
       data: value,
-      expiresAt: Date.now() + ttlSeconds * 1000,
+      expiresAt: expiresAt,
       lastAccessed: Date.now()
     });
   }

@@ -71,32 +71,6 @@ services:
     networks:
       - notifications-network
 
-  db-migrate:
-    image: postgres:15
-    container_name: notif_db_migrate
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      PGHOST: postgres
-      PGPORT: 5432
-      PGUSER: postgres
-      PGPASSWORD: postgres
-      PGDATABASE: notifications
-    volumes:
-      - ../migration-scripts/initdb:/migrations:ro
-    command: >
-      sh -c "
-        until pg_isready -h postgres -p 5432; do sleep 1; done;
-        psql -f /migrations/000_schema.sql;
-        psql -f /migrations/001_seed.sql;
-        echo 'Migrations applied successfully';
-      "
-    restart: "no"
-    networks:
-      - notifications-network
-
-
 networks:
   notifications-network:
     name: notifications-network
