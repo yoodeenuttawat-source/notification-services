@@ -1,3 +1,4 @@
+import { Inject } from '@nestjs/common';
 import { ConfigService } from '../cache/config.service';
 import { ProviderFactoryService } from '../providers/provider-factory.service';
 import { KAFKA_TOPICS } from '../kafka/kafka.config';

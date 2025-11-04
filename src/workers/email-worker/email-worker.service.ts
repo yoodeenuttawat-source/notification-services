@@ -62,7 +62,7 @@ export class EmailWorkerService extends ChannelWorkerBaseService implements OnMo
       if (!message) return;
 
       // Check for duplicate message
-      if (this.isDuplicate(message.notification_id)) {
+      if (await this.isDuplicate(message.notification_id)) {
         this.logger.warn(
           `Duplicate email notification detected, skipping: ${message.notification_id}`
         );
@@ -70,7 +70,7 @@ export class EmailWorkerService extends ChannelWorkerBaseService implements OnMo
       }
 
       // Mark as processed to prevent duplicates
-      this.markAsProcessed(message.notification_id);
+      await this.markAsProcessed(message.notification_id);
 
       // Validate email-specific requirements
       if (!(await this.validateEmailMessage(message))) return;

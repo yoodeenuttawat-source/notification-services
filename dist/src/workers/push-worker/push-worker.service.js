@@ -56,11 +56,11 @@ let PushWorkerService = PushWorkerService_1 = class PushWorkerService extends ch
             const message = await this.parseMessage(originalMessage);
             if (!message)
                 return;
-            if (this.isDuplicate(message.notification_id)) {
+            if (await this.isDuplicate(message.notification_id)) {
                 this.logger.warn(`Duplicate push notification detected, skipping: ${message.notification_id}`);
                 return;
             }
-            this.markAsProcessed(message.notification_id);
+            await this.markAsProcessed(message.notification_id);
             const providers = await this.getProviders(message.channel_id);
             if (!providers || providers.length === 0) {
                 await this.handleNoProviders(message, originalMessage, payload.message.key?.toString());

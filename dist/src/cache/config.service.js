@@ -70,7 +70,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             const key = `${template.event_id}:${template.channel_id}`;
             templatesByEventChannel.set(key, template);
         }
-        this.cacheService.set(this.CACHE_KEYS.TEMPLATES, Object.fromEntries(templatesByEventChannel));
+        await this.cacheService.set(this.CACHE_KEYS.TEMPLATES, Object.fromEntries(templatesByEventChannel));
         this.logger.log(`Cached ${templatesByEventChannel.size} templates`);
     }
     async cacheEventChannelMappings() {
@@ -82,7 +82,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             }
             mappingsByEvent.get(mapping.event_id).push(mapping);
         }
-        this.cacheService.set(this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS, Object.fromEntries(mappingsByEvent));
+        await this.cacheService.set(this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS, Object.fromEntries(mappingsByEvent));
         this.logger.log(`Refresh Cached ${mappingsByEvent.size} event channel mappings`);
     }
     async cacheProviders() {
@@ -94,7 +94,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             }
             providersByChannel.get(provider.channel_id).push(provider);
         }
-        this.cacheService.set(this.CACHE_KEYS.PROVIDERS, Object.fromEntries(providersByChannel));
+        await this.cacheService.set(this.CACHE_KEYS.PROVIDERS, Object.fromEntries(providersByChannel));
         this.logger.log(`Cached ${providersByChannel.size} providers`);
     }
     async cacheEvents() {
@@ -103,7 +103,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         for (const event of result.rows) {
             eventsMap.set(event.event_id, event.name);
         }
-        this.cacheService.set(this.CACHE_KEYS.EVENTS, Object.fromEntries(eventsMap));
+        await this.cacheService.set(this.CACHE_KEYS.EVENTS, Object.fromEntries(eventsMap));
         this.logger.log(`Cached ${eventsMap.size} events`);
     }
     async cacheChannels() {
@@ -112,11 +112,11 @@ let ConfigService = ConfigService_1 = class ConfigService {
         for (const channel of result.rows) {
             channelsMap.set(channel.channel_id, channel.channel);
         }
-        this.cacheService.set(this.CACHE_KEYS.CHANNELS, Object.fromEntries(channelsMap));
+        await this.cacheService.set(this.CACHE_KEYS.CHANNELS, Object.fromEntries(channelsMap));
         this.logger.log(`Cached ${channelsMap.size} channels`);
     }
     async getTemplate(eventId, channelId) {
-        const cached = this.cacheService.get(this.CACHE_KEYS.TEMPLATES);
+        const cached = await this.cacheService.get(this.CACHE_KEYS.TEMPLATES);
         if (cached) {
             const key = `${eventId}:${channelId}`;
             return cached[key] || null;
@@ -126,7 +126,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         return template || null;
     }
     async getEventChannelMappings(eventId) {
-        const cached = this.cacheService.get(this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS);
+        const cached = await this.cacheService.get(this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS);
         if (cached && cached[eventId]) {
             return cached[eventId];
         }
@@ -134,7 +134,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         return result.rows.filter((m) => m.event_id === eventId);
     }
     async getProvidersByChannel(channelId) {
-        const cached = this.cacheService.get(this.CACHE_KEYS.PROVIDERS);
+        const cached = await this.cacheService.get(this.CACHE_KEYS.PROVIDERS);
         if (cached && cached[channelId]) {
             return cached[channelId];
         }
@@ -142,7 +142,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
         return result.rows.filter((p) => p.channel_id === channelId);
     }
     async getEventInfoByName(eventName) {
-        const cached = this.cacheService.get(this.CACHE_KEYS.EVENTS);
+        const cached = await this.cacheService.get(this.CACHE_KEYS.EVENTS);
         if (cached) {
             const entry = Object.entries(cached).find(([_, name]) => name === eventName);
             if (entry) {

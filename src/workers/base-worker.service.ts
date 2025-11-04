@@ -162,18 +162,18 @@ export abstract class BaseWorkerService {
   /**
    * Check if notification has been processed recently (deduplication)
    */
-  protected isDuplicate(notificationId: string): boolean {
+  protected async isDuplicate(notificationId: string): Promise<boolean> {
     const cacheKey = `${this.getDedupKeyPrefix()}${notificationId}`;
-    const cached = this.cacheService.get<boolean>(cacheKey);
+    const cached = await this.cacheService.get<boolean>(cacheKey);
     return cached === true;
   }
 
   /**
    * Mark notification as processed to prevent duplicates
    */
-  protected markAsProcessed(notificationId: string): void {
+  protected async markAsProcessed(notificationId: string): Promise<void> {
     const cacheKey = `${this.getDedupKeyPrefix()}${notificationId}`;
-    this.cacheService.set(cacheKey, true, this.DEDUP_TTL_SECONDS);
+    await this.cacheService.set(cacheKey, true, this.DEDUP_TTL_SECONDS);
   }
 
   /**

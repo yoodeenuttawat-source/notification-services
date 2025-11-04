@@ -92,7 +92,10 @@ export class ConfigService implements OnModuleInit {
       templatesByEventChannel.set(key, template);
     }
 
-    this.cacheService.set(this.CACHE_KEYS.TEMPLATES, Object.fromEntries(templatesByEventChannel));
+    await this.cacheService.set(
+      this.CACHE_KEYS.TEMPLATES,
+      Object.fromEntries(templatesByEventChannel)
+    );
     this.logger.log(`Cached ${templatesByEventChannel.size} templates`);
   }
 
@@ -109,7 +112,7 @@ export class ConfigService implements OnModuleInit {
       mappingsByEvent.get(mapping.event_id)!.push(mapping);
     }
 
-    this.cacheService.set(
+    await this.cacheService.set(
       this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS,
       Object.fromEntries(mappingsByEvent)
     );
@@ -127,7 +130,7 @@ export class ConfigService implements OnModuleInit {
       providersByChannel.get(provider.channel_id)!.push(provider);
     }
 
-    this.cacheService.set(this.CACHE_KEYS.PROVIDERS, Object.fromEntries(providersByChannel));
+    await this.cacheService.set(this.CACHE_KEYS.PROVIDERS, Object.fromEntries(providersByChannel));
     this.logger.log(`Cached ${providersByChannel.size} providers`);
   }
 
@@ -141,7 +144,7 @@ export class ConfigService implements OnModuleInit {
       eventsMap.set(event.event_id, event.name);
     }
 
-    this.cacheService.set(this.CACHE_KEYS.EVENTS, Object.fromEntries(eventsMap));
+    await this.cacheService.set(this.CACHE_KEYS.EVENTS, Object.fromEntries(eventsMap));
     this.logger.log(`Cached ${eventsMap.size} events`);
   }
 
@@ -156,12 +159,14 @@ export class ConfigService implements OnModuleInit {
       channelsMap.set(channel.channel_id, channel.channel);
     }
 
-    this.cacheService.set(this.CACHE_KEYS.CHANNELS, Object.fromEntries(channelsMap));
+    await this.cacheService.set(this.CACHE_KEYS.CHANNELS, Object.fromEntries(channelsMap));
     this.logger.log(`Cached ${channelsMap.size} channels`);
   }
 
   async getTemplate(eventId: number, channelId: number): Promise<TemplateCache | null> {
-    const cached = this.cacheService.get<Record<string, TemplateCache>>(this.CACHE_KEYS.TEMPLATES);
+    const cached = await this.cacheService.get<Record<string, TemplateCache>>(
+      this.CACHE_KEYS.TEMPLATES
+    );
     if (cached) {
       const key = `${eventId}:${channelId}`;
       return cached[key] || null;
@@ -175,7 +180,7 @@ export class ConfigService implements OnModuleInit {
   }
 
   async getEventChannelMappings(eventId: number): Promise<EventChannelMappingCache[]> {
-    const cached = this.cacheService.get<Record<number, EventChannelMappingCache[]>>(
+    const cached = await this.cacheService.get<Record<number, EventChannelMappingCache[]>>(
       this.CACHE_KEYS.EVENT_CHANNEL_MAPPINGS
     );
     if (cached && cached[eventId]) {
@@ -191,7 +196,7 @@ export class ConfigService implements OnModuleInit {
   }
 
   async getProvidersByChannel(channelId: number): Promise<ProviderCache[]> {
-    const cached = this.cacheService.get<Record<number, ProviderCache[]>>(
+    const cached = await this.cacheService.get<Record<number, ProviderCache[]>>(
       this.CACHE_KEYS.PROVIDERS
     );
     if (cached && cached[channelId]) {
@@ -207,7 +212,7 @@ export class ConfigService implements OnModuleInit {
   async getEventInfoByName(
     eventName: string
   ): Promise<{ eventId: number; eventName: string } | null> {
-    const cached = this.cacheService.get<Record<number, string>>(this.CACHE_KEYS.EVENTS);
+    const cached = await this.cacheService.get<Record<number, string>>(this.CACHE_KEYS.EVENTS);
     if (cached) {
       // Find event_id by searching through cached events
       const entry = Object.entries(cached).find(([_, name]) => name === eventName);

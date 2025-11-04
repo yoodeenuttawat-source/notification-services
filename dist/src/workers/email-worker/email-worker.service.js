@@ -56,11 +56,11 @@ let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService extends
             const message = await this.parseMessage(originalMessage);
             if (!message)
                 return;
-            if (this.isDuplicate(message.notification_id)) {
+            if (await this.isDuplicate(message.notification_id)) {
                 this.logger.warn(`Duplicate email notification detected, skipping: ${message.notification_id}`);
                 return;
             }
-            this.markAsProcessed(message.notification_id);
+            await this.markAsProcessed(message.notification_id);
             if (!(await this.validateEmailMessage(message)))
                 return;
             const providers = await this.getProviders(message.channel_id);

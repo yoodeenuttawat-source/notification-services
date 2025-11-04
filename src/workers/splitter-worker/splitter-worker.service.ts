@@ -61,13 +61,13 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
       if (!message) return;
 
       // Check for duplicate message
-      if (this.isDuplicate(message.notification_id)) {
+      if (await this.isDuplicate(message.notification_id)) {
         this.logger.warn(`Duplicate notification detected, skipping: ${message.notification_id}`);
         return; // Skip processing duplicate message
       }
 
       // Mark as processed to prevent duplicates
-      this.markAsProcessed(message.notification_id);
+      await this.markAsProcessed(message.notification_id);
 
       // Validate message has templates
       if (!(await this.validateMessage(message))) return;

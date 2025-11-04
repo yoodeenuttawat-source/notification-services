@@ -8,110 +8,118 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var CacheService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CacheService = void 0;
 const common_1 = require("@nestjs/common");
-let CacheService = CacheService_1 = class CacheService {
-    constructor() {
-        this.logger = new common_1.Logger(CacheService_1.name);
-        this.inMemoryCache = new Map();
-        this.maxSize = parseInt(process.env.CACHE_MAX_SIZE || '10000', 10);
+const async_lru_cache_1 = require("@wfp99/async-lru-cache");
+let CacheService = class CacheService {
+    constructor(options) {
+        this.keyIndex = new Set();
+        const maxSizeEnv = options?.maxSize || parseInt(process.env.CACHE_MAX_SIZE || '10000', 10);
+        this.maxSize = maxSizeEnv;
+        this.cacheName = options?.cacheName || 'CacheService';
+        this.logger = new common_1.Logger(this.cacheName);
+        this.cache = new async_lru_cache_1.AsyncLRUCache({
+            capacity: this.maxSize,
+            defaultTtlMs: 0,
+        });
         this.logger.log(`Cache max size configured: ${this.maxSize} entries`);
     }
     async onModuleInit() {
-        this.logger.log(`Using in-memory cache (max size: ${this.maxSize} entries)`);
-        setInterval(() => this.cleanupExpiredEntries(), 60000);
+        this.logger.log(`[${this.cacheName}] Using in-memory LRU cache with concurrent support (max size: ${this.maxSize} entries)`);
+        setInterval(() => {
+            this.cache.cleanupExpired();
+            this.cleanupKeyIndex();
+        }, 60000);
     }
-    get(key) {
-        const cached = this.inMemoryCache.get(key);
-        if (cached && cached.expiresAt > Date.now()) {
-            cached.lastAccessed = Date.now();
-            this.inMemoryCache.delete(key);
-            this.inMemoryCache.set(key, cached);
-            return cached.data;
+    cleanupKeyIndex() {
+        for (const key of this.keyIndex) {
+            if (!this.cache.has(key)) {
+                this.keyIndex.delete(key);
+            }
         }
-        if (cached) {
-            this.inMemoryCache.delete(key);
-        }
-        return null;
     }
-    set(key, value, ttlSeconds) {
-        const expiresAt = ttlSeconds === undefined || ttlSeconds === 0
-            ? Number.MAX_SAFE_INTEGER
-            : Date.now() + ttlSeconds * 1000;
-        if (this.inMemoryCache.has(key)) {
-            this.inMemoryCache.set(key, {
-                data: value,
-                expiresAt: expiresAt,
-                lastAccessed: Date.now(),
+    async get(key) {
+        try {
+            if (!this.cache.has(key)) {
+                return null;
+            }
+            const value = await this.cache.get(key, async () => {
+                throw new Error('CACHE_MISS');
             });
-            const entry = this.inMemoryCache.get(key);
-            this.inMemoryCache.delete(key);
-            this.inMemoryCache.set(key, entry);
-            return;
+            return value !== null && value !== undefined ? value : null;
         }
-        if (this.inMemoryCache.size >= this.maxSize) {
-            this.evictEntries();
+        catch (error) {
+            if (error?.message === 'CACHE_MISS') {
+                return null;
+            }
+            this.logger.error(`Error getting cache key "${key}":`, error);
+            return null;
         }
-        this.inMemoryCache.set(key, {
-            data: value,
-            expiresAt: expiresAt,
-            lastAccessed: Date.now(),
-        });
+    }
+    async set(key, value, ttlSeconds) {
+        try {
+            const ttlMs = ttlSeconds === undefined || ttlSeconds === 0
+                ? undefined
+                : ttlSeconds * 1000;
+            await this.cache.put(key, value, undefined, ttlMs);
+            this.keyIndex.add(key);
+        }
+        catch (error) {
+            this.logger.error(`Error setting cache key "${key}":`, error);
+        }
     }
     delete(key) {
-        this.inMemoryCache.delete(key);
+        try {
+            this.cache.invalidate(key);
+            this.keyIndex.delete(key);
+        }
+        catch (error) {
+            this.logger.error(`Error deleting cache key "${key}":`, error);
+        }
     }
-    deletePattern(pattern) {
-        const regex = new RegExp(pattern.replace(/\*/g, '.*'));
-        for (const key of this.inMemoryCache.keys()) {
-            if (regex.test(key)) {
-                this.inMemoryCache.delete(key);
+    async deletePattern(pattern) {
+        try {
+            const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+            const keysToDelete = [];
+            for (const key of this.keyIndex) {
+                if (regex.test(key)) {
+                    keysToDelete.push(key);
+                }
+            }
+            for (const key of keysToDelete) {
+                this.cache.invalidate(key);
+                this.keyIndex.delete(key);
+            }
+            if (keysToDelete.length > 0) {
+                this.logger.debug(`Deleted ${keysToDelete.length} keys matching pattern "${pattern}"`);
             }
         }
-    }
-    cleanupExpiredEntries() {
-        const now = Date.now();
-        let cleaned = 0;
-        for (const [key, entry] of this.inMemoryCache.entries()) {
-            if (entry.expiresAt <= now) {
-                this.inMemoryCache.delete(key);
-                cleaned++;
-            }
-        }
-        if (cleaned > 0) {
-            this.logger.debug(`Cleaned up ${cleaned} expired cache entries`);
-        }
-    }
-    evictEntries() {
-        const currentSize = this.inMemoryCache.size;
-        const targetSize = Math.floor(this.maxSize * 0.9);
-        const entriesToEvict = currentSize - targetSize;
-        if (entriesToEvict <= 0) {
-            return;
-        }
-        const entries = Array.from(this.inMemoryCache.entries()).sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
-        let evicted = 0;
-        for (let i = 0; i < entriesToEvict && i < entries.length; i++) {
-            this.inMemoryCache.delete(entries[i][0]);
-            evicted++;
-        }
-        if (evicted > 0) {
-            this.logger.warn(`Cache size limit reached (${currentSize}/${this.maxSize}). Evicted ${evicted} oldest entries (LRU policy). Current size: ${this.inMemoryCache.size}`);
+        catch (error) {
+            this.logger.error(`Error deleting cache pattern "${pattern}":`, error);
         }
     }
     getStats() {
-        return {
-            size: this.inMemoryCache.size,
-            maxSize: this.maxSize,
-            keys: Array.from(this.inMemoryCache.keys()),
-        };
+        try {
+            return {
+                size: this.cache.size(),
+                maxSize: this.maxSize,
+                keys: Array.from(this.keyIndex),
+            };
+        }
+        catch (error) {
+            this.logger.error('Error getting cache stats:', error);
+            return {
+                size: 0,
+                maxSize: this.maxSize,
+                keys: [],
+            };
+        }
     }
 };
 exports.CacheService = CacheService;
-exports.CacheService = CacheService = CacheService_1 = __decorate([
+exports.CacheService = CacheService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [])
+    __metadata("design:paramtypes", [Object])
 ], CacheService);
 //# sourceMappingURL=cache.service.js.map

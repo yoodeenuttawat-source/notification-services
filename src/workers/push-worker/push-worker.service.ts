@@ -62,7 +62,7 @@ export class PushWorkerService extends ChannelWorkerBaseService implements OnMod
       if (!message) return;
 
       // Check for duplicate message
-      if (this.isDuplicate(message.notification_id)) {
+      if (await this.isDuplicate(message.notification_id)) {
         this.logger.warn(
           `Duplicate push notification detected, skipping: ${message.notification_id}`
         );
@@ -70,7 +70,7 @@ export class PushWorkerService extends ChannelWorkerBaseService implements OnMod
       }
 
       // Mark as processed to prevent duplicates
-      this.markAsProcessed(message.notification_id);
+      await this.markAsProcessed(message.notification_id);
 
       // Get providers and validate
       const providers = await this.getProviders(message.channel_id);

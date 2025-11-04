@@ -1,143 +1,134 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { AsyncLRUCache } from '@wfp99/async-lru-cache';
 
-interface CacheEntry {
-  data: any;
-  expiresAt: number;
-  lastAccessed: number;
+export interface CacheServiceOptions {
+  maxSize?: number;
+  cacheName?: string;
 }
 
 @Injectable()
 export class CacheService implements OnModuleInit {
-  private readonly logger = new Logger(CacheService.name);
-  private readonly inMemoryCache: Map<string, CacheEntry> = new Map();
+  private readonly logger: Logger;
+  private readonly cache: AsyncLRUCache<string, any>;
   private readonly maxSize: number;
+  private readonly cacheName: string;
+  // Track keys for pattern deletion support
+  private readonly keyIndex: Set<string> = new Set();
 
-  constructor() {
-    // Default to 10,000 entries, configurable via env var
-    this.maxSize = parseInt(process.env.CACHE_MAX_SIZE || '10000', 10);
+  constructor(options?: CacheServiceOptions) {
+    const maxSizeEnv = options?.maxSize || parseInt(process.env.CACHE_MAX_SIZE || '10000', 10);
+    this.maxSize = maxSizeEnv;
+    this.cacheName = options?.cacheName || 'CacheService';
+    this.logger = new Logger(this.cacheName);
+
+    // Create async LRU cache with concurrent access support
+    this.cache = new AsyncLRUCache<string, any>({
+      capacity: this.maxSize,
+      // Default TTL of 0 means no expiration by default (we'll set per-item TTL)
+      defaultTtlMs: 0,
+    });
+
     this.logger.log(`Cache max size configured: ${this.maxSize} entries`);
   }
 
   async onModuleInit() {
-    this.logger.log(`Using in-memory cache (max size: ${this.maxSize} entries)`);
+    this.logger.log(
+      `[${this.cacheName}] Using in-memory LRU cache with concurrent support (max size: ${this.maxSize} entries)`
+    );
     // Start cleanup interval to remove expired entries
-    setInterval(() => this.cleanupExpiredEntries(), 60000); // Cleanup every minute
+    setInterval(() => {
+      this.cache.cleanupExpired();
+      // Clean up expired keys from keyIndex
+      this.cleanupKeyIndex();
+    }, 60000); // Cleanup every minute
   }
 
-  get<T>(key: string): T | null {
-    const cached = this.inMemoryCache.get(key);
-    if (cached && cached.expiresAt > Date.now()) {
-      // Update last accessed time for LRU
-      cached.lastAccessed = Date.now();
-      // Move to end of map (most recently used) - Map maintains insertion order
-      this.inMemoryCache.delete(key);
-      this.inMemoryCache.set(key, cached);
-      return cached.data as T;
+  /**
+   * Clean up expired keys from keyIndex
+   */
+  private cleanupKeyIndex(): void {
+    // Remove keys from index that are no longer in cache
+    for (const key of this.keyIndex) {
+      if (!this.cache.has(key)) {
+        this.keyIndex.delete(key);
+      }
     }
-
-    // Remove expired entry
-    if (cached) {
-      this.inMemoryCache.delete(key);
-    }
-
-    return null;
   }
 
-  set(key: string, value: any, ttlSeconds?: number): void {
-    // If ttlSeconds is 0 or undefined, set expiresAt to a very large number (effectively never expires)
-    const expiresAt =
-      ttlSeconds === undefined || ttlSeconds === 0
-        ? Number.MAX_SAFE_INTEGER
-        : Date.now() + ttlSeconds * 1000;
+  async get<T>(key: string): Promise<T | null> {
+    try {
+      // Check if key exists first (sync check)
+      if (!this.cache.has(key)) {
+        return null;
+      }
 
-    // Check if key already exists (update case)
-    if (this.inMemoryCache.has(key)) {
-      this.inMemoryCache.set(key, {
-        data: value,
-        expiresAt: expiresAt,
-        lastAccessed: Date.now(),
+      // Use get() with a loader that throws to indicate cache miss
+      // This ensures we only get cached values, not load new ones
+      // The cache will handle concurrency and merge concurrent requests
+      const value = await this.cache.get(key, async () => {
+        // This should not be called if has() returns true
+        // But if race condition occurs, throw to indicate cache miss
+        throw new Error('CACHE_MISS');
       });
-      // Move to end (most recently used)
-      const entry = this.inMemoryCache.get(key)!;
-      this.inMemoryCache.delete(key);
-      this.inMemoryCache.set(key, entry);
-      return;
-    }
 
-    // Check if we need to evict entries before adding new one
-    if (this.inMemoryCache.size >= this.maxSize) {
-      this.evictEntries();
+      return value !== null && value !== undefined ? (value as T) : null;
+    } catch (error: any) {
+      // Handle cache miss (loader threw error)
+      if (error?.message === 'CACHE_MISS') {
+        return null;
+      }
+      this.logger.error(`Error getting cache key "${key}":`, error);
+      return null;
     }
+  }
 
-    // Add new entry
-    this.inMemoryCache.set(key, {
-      data: value,
-      expiresAt: expiresAt,
-      lastAccessed: Date.now(),
-    });
+  async set(key: string, value: any, ttlSeconds?: number): Promise<void> {
+    try {
+      const ttlMs =
+        ttlSeconds === undefined || ttlSeconds === 0
+          ? undefined // No expiration
+          : ttlSeconds * 1000; // Convert to milliseconds
+
+      await this.cache.put(key, value, undefined, ttlMs);
+      // Track key for pattern deletion
+      this.keyIndex.add(key);
+    } catch (error) {
+      this.logger.error(`Error setting cache key "${key}":`, error);
+    }
   }
 
   delete(key: string): void {
-    this.inMemoryCache.delete(key);
+    try {
+      this.cache.invalidate(key);
+      this.keyIndex.delete(key);
+    } catch (error) {
+      this.logger.error(`Error deleting cache key "${key}":`, error);
+    }
   }
 
-  deletePattern(pattern: string): void {
-    const regex = new RegExp(pattern.replace(/\*/g, '.*'));
-    for (const key of this.inMemoryCache.keys()) {
-      if (regex.test(key)) {
-        this.inMemoryCache.delete(key);
+  async deletePattern(pattern: string): Promise<void> {
+    try {
+      const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+      const keysToDelete: string[] = [];
+
+      // Collect keys matching the pattern
+      for (const key of this.keyIndex) {
+        if (regex.test(key)) {
+          keysToDelete.push(key);
+        }
       }
-    }
-  }
 
-  /**
-   * Cleanup expired entries periodically
-   */
-  private cleanupExpiredEntries(): void {
-    const now = Date.now();
-    let cleaned = 0;
-
-    for (const [key, entry] of this.inMemoryCache.entries()) {
-      if (entry.expiresAt <= now) {
-        this.inMemoryCache.delete(key);
-        cleaned++;
+      // Delete collected keys
+      for (const key of keysToDelete) {
+        this.cache.invalidate(key);
+        this.keyIndex.delete(key);
       }
-    }
 
-    if (cleaned > 0) {
-      this.logger.debug(`Cleaned up ${cleaned} expired cache entries`);
-    }
-  }
-
-  /**
-   * Evict entries when cache reaches max size (LRU policy)
-   * Removes oldest 10% of entries or enough to bring size below max
-   */
-  private evictEntries(): void {
-    const currentSize = this.inMemoryCache.size;
-    const targetSize = Math.floor(this.maxSize * 0.9); // Evict to 90% of max size
-    const entriesToEvict = currentSize - targetSize;
-
-    if (entriesToEvict <= 0) {
-      return;
-    }
-
-    // Sort entries by lastAccessed time (oldest first)
-    const entries = Array.from(this.inMemoryCache.entries()).sort(
-      (a, b) => a[1].lastAccessed - b[1].lastAccessed
-    );
-
-    // Evict oldest entries
-    let evicted = 0;
-    for (let i = 0; i < entriesToEvict && i < entries.length; i++) {
-      this.inMemoryCache.delete(entries[i][0]);
-      evicted++;
-    }
-
-    if (evicted > 0) {
-      this.logger.warn(
-        `Cache size limit reached (${currentSize}/${this.maxSize}). Evicted ${evicted} oldest entries (LRU policy). Current size: ${this.inMemoryCache.size}`
-      );
+      if (keysToDelete.length > 0) {
+        this.logger.debug(`Deleted ${keysToDelete.length} keys matching pattern "${pattern}"`);
+      }
+    } catch (error) {
+      this.logger.error(`Error deleting cache pattern "${pattern}":`, error);
     }
   }
 
@@ -145,10 +136,19 @@ export class CacheService implements OnModuleInit {
    * Get cache statistics (useful for debugging)
    */
   getStats(): { size: number; maxSize: number; keys: string[] } {
-    return {
-      size: this.inMemoryCache.size,
-      maxSize: this.maxSize,
-      keys: Array.from(this.inMemoryCache.keys()),
-    };
+    try {
+      return {
+        size: this.cache.size(),
+        maxSize: this.maxSize,
+        keys: Array.from(this.keyIndex),
+      };
+    } catch (error) {
+      this.logger.error('Error getting cache stats:', error);
+      return {
+        size: 0,
+        maxSize: this.maxSize,
+        keys: [],
+      };
+    }
   }
 }

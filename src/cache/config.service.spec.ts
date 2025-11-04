@@ -3,6 +3,7 @@ import { ConfigService } from './config.service';
 import { CacheService } from './cache.service';
 import { DatabaseService } from '../database/database.service';
 
+
 describe('ConfigService', () => {
   let service: ConfigService;
   let cacheService: CacheService;
@@ -16,7 +17,10 @@ describe('ConfigService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ConfigService,
-        CacheService,
+        {
+          provide: CacheService,
+          useFactory: () => new CacheService({ maxSize: 10000, cacheName: 'ConfigCache' }),
+        },
         {
           provide: DatabaseService,
           useValue: mockDatabaseService,
@@ -49,7 +53,7 @@ describe('ConfigService', () => {
         required_fields: [],
       };
 
-      cacheService.set('config:templates', {
+      await cacheService.set('config:templates', {
         '1:1': mockTemplate,
       });
 
@@ -120,7 +124,7 @@ describe('ConfigService', () => {
         { event_id: 1, event_name: 'TEST', channel_id: 2, channel_name: 'PUSH' },
       ];
 
-      cacheService.set('config:event_channel_mappings', {
+      await cacheService.set('config:event_channel_mappings', {
         1: mockMappings,
       });
 
@@ -131,7 +135,7 @@ describe('ConfigService', () => {
 
     it('should return empty array when event not in cache', async () => {
       // Set cache with a different event_id to ensure event 1 is not in cache
-      cacheService.set('config:event_channel_mappings', {
+      await cacheService.set('config:event_channel_mappings', {
         999: [{ event_id: 999, event_name: 'OTHER', channel_id: 1, channel_name: 'EMAIL' }],
       });
 
@@ -184,7 +188,7 @@ describe('ConfigService', () => {
         { provider_id: 1, name: 'EmailProvider1', channel_id: 1, priority: 1 },
       ];
 
-      cacheService.set('config:providers', {
+      await cacheService.set('config:providers', {
         1: mockProviders,
       });
 
@@ -195,7 +199,7 @@ describe('ConfigService', () => {
 
     it('should return empty array when channel not in cache', async () => {
       // Set cache with a different channel_id to ensure channel 1 is not in cache
-      cacheService.set('config:providers', {
+      await cacheService.set('config:providers', {
         999: [{ provider_id: 2, name: 'PushProvider1', channel_id: 999, priority: 1 }],
       });
 
@@ -244,7 +248,7 @@ describe('ConfigService', () => {
 
   describe('getEventInfoByName', () => {
     it('should return event info from cache when available', async () => {
-      cacheService.set('config:events', {
+      await cacheService.set('config:events', {
         1: 'CHAT_MESSAGE',
         2: 'PURCHASE',
       });
@@ -255,7 +259,7 @@ describe('ConfigService', () => {
     });
 
     it('should return null when event not found in cache', async () => {
-      cacheService.set('config:events', {});
+      await cacheService.set('config:events', {});
 
       mockDatabaseService.callProcedure.mockResolvedValue({
         rows: [],
@@ -336,11 +340,11 @@ describe('ConfigService', () => {
       await service.refreshCache();
 
       // Verify all caches were populated
-      expect(cacheService.get('config:templates')).toBeDefined();
-      expect(cacheService.get('config:event_channel_mappings')).toBeDefined();
-      expect(cacheService.get('config:providers')).toBeDefined();
-      expect(cacheService.get('config:events')).toBeDefined();
-      expect(cacheService.get('config:channels')).toBeDefined();
+      expect(await cacheService.get('config:templates')).toBeDefined();
+      expect(await cacheService.get('config:event_channel_mappings')).toBeDefined();
+      expect(await cacheService.get('config:providers')).toBeDefined();
+      expect(await cacheService.get('config:events')).toBeDefined();
+      expect(await cacheService.get('config:channels')).toBeDefined();
     });
 
     it('should throw error when refresh fails', async () => {
@@ -380,7 +384,7 @@ describe('ConfigService', () => {
 
       await service.refreshCache();
 
-      const templates = cacheService.get<Record<string, any>>('config:templates');
+      const templates = await cacheService.get<Record<string, any>>('config:templates');
       expect(templates).toBeDefined();
       expect(templates!['1:1']).toBeDefined();
       expect(templates!['1:2']).toBeDefined();
@@ -393,7 +397,10 @@ describe('ConfigService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           ConfigService,
-          CacheService,
+          {
+            provide: CacheService,
+            useFactory: () => new CacheService({ maxSize: 10000, cacheName: 'ConfigCache' }),
+          },
           {
             provide: DatabaseService,
             useValue: mockDatabaseService,
@@ -415,7 +422,10 @@ describe('ConfigService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           ConfigService,
-          CacheService,
+          {
+            provide: CacheService,
+            useFactory: () => new CacheService({ maxSize: 10000, cacheName: 'ConfigCache' }),
+          },
           {
             provide: DatabaseService,
             useValue: mockDatabaseService,

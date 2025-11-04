@@ -1,0 +1,20 @@
+Data flow
+1. internal service (chat, order, etc) call notification api to send notification for specific event type. The supported events are chat message, purchase, payment reminder, shipping update
+2. Notification Api validate the body payload and get the available channels for this event type. then select template base on db configuration and substitute data to the templates then publish event to notification topic and delivery_logs
+3. Splitter worker consume message and check if message is duplicated or not. if it's duplicated then we skip this message otherwise we process message normally and then split message based on supported channels (email, push) then publish to email topic and push topic and publish each channel to delivery_logs
+4. Email worker and Push worker consume the message and get list of available providers sorted by priority then call provider api in the order of priority if the first one is not successful. every provider api calls we send event to provider_request_response topic and send status to delivery_logs
+5. if any worker process the message and it failed. we will separate to 2 types of messages. retryable and non-retryable. for retryable we will publish to dlq and for non-retryable do the same thing but don't send to dlq
+6. Kafka connector will subscribe all topics to build the table from events
+
+
+Assumption
+1. We want system to be scalable and handle 100k Notification per minute = 1667 Notification per second and focus on Reliability so we have 2 options to use outbox pattern or event sourcing so it can achieve this in one transaction but outbox pattern has limitation on database. I decide to do event sourcing instead because the bottleneck will be kafka which support high throughput
+2. Assume that all providers support idempotent key so we can retry multiple times without worrying on user getting duplicate notification
+3. Assume that when we call provider they response 'sent' instantly so we don't need to care about webhook/callback stuff
+4. Assume that we can ignore 'read', 'click' status to reduce the scope of the designs
+5. Assume that we don't need to send deviceTokens for each push provider (we can add it later. it just one api call)
+6. Assume that our system will decide the channel of each event type and configuration is already stored in db. We can have backoffice in the future.
+7. Assume that user will have a chance to get duplicate notification. allow duplicated notifications
+8. We can configure channel for each event in runtime but for message that is in notification topic we can't change since we already validate the request payload in api level already. I don't want to increase complexity of the system
+
+
