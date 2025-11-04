@@ -16,7 +16,7 @@ exports.ProvidersModule = ProvidersModule;
 exports.ProvidersModule = ProvidersModule = __decorate([
     (0, common_1.Module)({
         providers: [CircuitBreakerService_1.CircuitBreakerService, provider_factory_service_1.ProviderFactoryService],
-        exports: [provider_factory_service_1.ProviderFactoryService, CircuitBreakerService_1.CircuitBreakerService]
+        exports: [provider_factory_service_1.ProviderFactoryService, CircuitBreakerService_1.CircuitBreakerService],
     })
 ], ProvidersModule);
 //# sourceMappingURL=providers.module.js.map

@@ -19,7 +19,7 @@ exports.CacheModule = CacheModule = __decorate([
     (0, common_1.Module)({
         imports: [schedule_1.ScheduleModule.forRoot(), database_module_1.DatabaseModule],
         providers: [cache_service_1.CacheService, config_service_1.ConfigService],
-        exports: [cache_service_1.CacheService, config_service_1.ConfigService]
+        exports: [cache_service_1.CacheService, config_service_1.ConfigService],
     })
 ], CacheModule);
 //# sourceMappingURL=cache.module.js.map

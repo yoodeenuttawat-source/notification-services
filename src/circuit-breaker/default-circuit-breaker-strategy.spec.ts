@@ -8,7 +8,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
     failureThreshold: 5,
     successThreshold: 3,
     timeout: 60000,
-    halfOpenMaxCalls: 3
+    halfOpenMaxCalls: 3,
   };
 
   beforeEach(() => {
@@ -22,7 +22,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 0,
         lastFailureTime: null,
         state: CircuitBreakerState.CLOSED,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       };
 
       expect(strategy.shouldAllowRequest(metrics, defaultConfig)).toBe(true);
@@ -34,7 +34,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 0,
         lastFailureTime: Date.now() - 1000, // 1 second ago
         state: CircuitBreakerState.OPEN,
-        lastStateChangeTime: Date.now() - 1000
+        lastStateChangeTime: Date.now() - 1000,
       };
 
       expect(strategy.shouldAllowRequest(metrics, defaultConfig)).toBe(false);
@@ -46,7 +46,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 0,
         lastFailureTime: Date.now() - 61000, // More than timeout
         state: CircuitBreakerState.OPEN,
-        lastStateChangeTime: Date.now() - 61000
+        lastStateChangeTime: Date.now() - 61000,
       };
 
       expect(strategy.shouldAllowRequest(metrics, defaultConfig)).toBe(true);
@@ -58,7 +58,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 0,
         lastFailureTime: null,
         state: CircuitBreakerState.HALF_OPEN,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       };
 
       expect(strategy.shouldAllowRequest(metrics, defaultConfig)).toBe(true);
@@ -70,7 +70,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 3, // At max calls
         lastFailureTime: null,
         state: CircuitBreakerState.HALF_OPEN,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       };
 
       expect(strategy.shouldAllowRequest(metrics, defaultConfig)).toBe(false);
@@ -84,7 +84,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 0,
         lastFailureTime: null,
         state: CircuitBreakerState.CLOSED,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       };
 
       const newState = strategy.recordSuccess(metrics, defaultConfig);
@@ -97,7 +97,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 2, // One away from threshold
         lastFailureTime: null,
         state: CircuitBreakerState.HALF_OPEN,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       };
 
       const newState = strategy.recordSuccess(metrics, defaultConfig);
@@ -110,7 +110,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 1,
         lastFailureTime: null,
         state: CircuitBreakerState.HALF_OPEN,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       };
 
       const newState = strategy.recordSuccess(metrics, defaultConfig);
@@ -125,7 +125,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 0,
         lastFailureTime: Date.now(),
         state: CircuitBreakerState.CLOSED,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       };
 
       const newState = strategy.recordFailure(metrics, defaultConfig);
@@ -138,7 +138,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 0,
         lastFailureTime: Date.now(),
         state: CircuitBreakerState.CLOSED,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       };
 
       const newState = strategy.recordFailure(metrics, defaultConfig);
@@ -151,7 +151,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 1,
         lastFailureTime: null,
         state: CircuitBreakerState.HALF_OPEN,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       };
 
       const newState = strategy.recordFailure(metrics, defaultConfig);
@@ -164,7 +164,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 0,
         lastFailureTime: Date.now(),
         state: CircuitBreakerState.OPEN,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       };
 
       const newState = strategy.recordFailure(metrics, defaultConfig);
@@ -179,7 +179,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 0,
         lastFailureTime: Date.now(),
         state: CircuitBreakerState.OPEN,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       };
 
       const newState = strategy.recordSuccess(metrics, defaultConfig);
@@ -192,7 +192,7 @@ describe('DefaultCircuitBreakerStrategy', () => {
         successCount: 1, // One below threshold
         lastFailureTime: null,
         state: CircuitBreakerState.HALF_OPEN,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       };
 
       const newState = strategy.recordSuccess(metrics, defaultConfig);
@@ -200,4 +200,3 @@ describe('DefaultCircuitBreakerStrategy', () => {
     });
   });
 });
-

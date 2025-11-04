@@ -18,7 +18,7 @@ exports.PushWorkerModule = PushWorkerModule;
 exports.PushWorkerModule = PushWorkerModule = __decorate([
     (0, common_1.Module)({
         imports: [kafka_module_1.KafkaModule, cache_module_1.CacheModule, providers_module_1.ProvidersModule],
-        providers: [push_worker_service_1.PushWorkerService]
+        providers: [push_worker_service_1.PushWorkerService],
     })
 ], PushWorkerModule);
 //# sourceMappingURL=push-worker.module.js.map

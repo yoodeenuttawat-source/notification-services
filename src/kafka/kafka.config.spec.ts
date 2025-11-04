@@ -82,4 +82,3 @@ describe('kafka.config', () => {
     });
   });
 });
-

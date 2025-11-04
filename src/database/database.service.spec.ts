@@ -81,7 +81,10 @@ describe('DatabaseService', () => {
 
       const result = await service.callProcedure('test_procedure', [1, 'test']);
 
-      expect(mockPool.query).toHaveBeenCalledWith('SELECT * FROM test_procedure($1, $2)', [1, 'test']);
+      expect(mockPool.query).toHaveBeenCalledWith('SELECT * FROM test_procedure($1, $2)', [
+        1,
+        'test',
+      ]);
       expect(result).toEqual({ rows: mockResult.rows, rowCount: mockResult.rowCount });
     });
 
@@ -89,7 +92,9 @@ describe('DatabaseService', () => {
       const error = new Error('Database connection failed');
       mockPool.query.mockRejectedValue(error);
 
-      await expect(service.callProcedure('test_procedure')).rejects.toThrow('Database connection failed');
+      await expect(service.callProcedure('test_procedure')).rejects.toThrow(
+        'Database connection failed'
+      );
     });
 
     it('should handle empty results', async () => {
@@ -216,4 +221,3 @@ describe('DatabaseService', () => {
     });
   });
 });
-

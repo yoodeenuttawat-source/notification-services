@@ -22,7 +22,8 @@ let KafkaService = KafkaService_1 = class KafkaService {
         this.kafka = new kafkajs_1.Kafka(config);
         this.producer = this.kafka.producer({
             allowAutoTopicCreation: true,
-            transactionTimeout: 30000
+            transactionTimeout: 30000,
+            createPartitioner: kafkajs_1.Partitioners.LegacyPartitioner,
         });
     }
     async onModuleInit() {
@@ -42,8 +43,8 @@ let KafkaService = KafkaService_1 = class KafkaService {
                 topic,
                 messages: messages.map((msg) => ({
                     key: msg.key,
-                    value: JSON.stringify(msg.value)
-                }))
+                    value: JSON.stringify(msg.value),
+                })),
             });
             this.logger.debug(`Published ${messages.length} message(s) to topic: ${topic}`);
         }
@@ -56,7 +57,7 @@ let KafkaService = KafkaService_1 = class KafkaService {
         const consumer = this.kafka.consumer({
             groupId,
             sessionTimeout: 30000,
-            heartbeatInterval: 3000
+            heartbeatInterval: 3000,
         });
         await consumer.connect();
         await consumer.subscribe({ topics, fromBeginning: false });
@@ -73,7 +74,7 @@ let KafkaService = KafkaService_1 = class KafkaService {
                 catch (error) {
                     this.logger.error('Error processing message:', error);
                 }
-            }
+            },
         });
     }
     getProducer() {

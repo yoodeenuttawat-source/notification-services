@@ -54,8 +54,8 @@ export class NotificationApiService {
       }
 
       // Render template (substitute variables)
-      const renderedSubject = template.subject 
-        ? this.substituteVariables(template.subject, dto.data) 
+      const renderedSubject = template.subject
+        ? this.substituteVariables(template.subject, dto.data)
         : undefined;
       const renderedContent = this.substituteVariables(template.content, dto.data);
 
@@ -76,12 +76,14 @@ export class NotificationApiService {
         template_name: template.name,
         subject: renderedSubject,
         content: renderedContent,
-        recipient
+        recipient,
       });
     }
 
     if (renderedTemplates.length === 0) {
-      throw new BadRequestException(`No valid templates could be rendered for event type '${dto.event_type}'`);
+      throw new BadRequestException(
+        `No valid templates could be rendered for event type '${dto.event_type}'`
+      );
     }
 
     // 4. Publish message to Kafka notification topic with pre-rendered templates
@@ -93,18 +95,20 @@ export class NotificationApiService {
       data: dto.data,
       metadata: {
         ...dto.metadata,
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     };
 
     await this.kafkaService.publishMessage(KAFKA_TOPICS.NOTIFICATION, [
       {
         key: dto.notification_id,
-        value: message
-      }
+        value: message,
+      },
     ]);
 
-    this.logger.log(`Notification published: ${dto.notification_id}, event: ${eventName}, templates: ${renderedTemplates.length}`);
+    this.logger.log(
+      `Notification published: ${dto.notification_id}, event: ${eventName}, templates: ${renderedTemplates.length}`
+    );
   }
 
   /**

@@ -8,6 +8,6 @@ import { DatabaseModule } from '../database/database.module';
 @Module({
   imports: [KafkaModule, CacheModule, DatabaseModule],
   controllers: [NotificationApiController],
-  providers: [NotificationApiService]
+  providers: [NotificationApiService],
 })
 export class NotificationApiModule {}

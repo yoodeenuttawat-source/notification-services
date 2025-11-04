@@ -62,17 +62,17 @@ describe('NotificationApiService', () => {
           sender_name: 'John',
           message_preview: 'Hello',
           user_id: 'user123',
-          user_email: 'user@example.com'
-        }
+          user_email: 'user@example.com',
+        },
       };
 
       mockConfigService.getEventInfoByName.mockResolvedValue({
         eventId: 1,
-        eventName: 'CHAT_MESSAGE'
+        eventName: 'CHAT_MESSAGE',
       });
 
       mockConfigService.getEventChannelMappings.mockResolvedValue([
-        { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 1, channel_name: 'EMAIL' }
+        { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 1, channel_name: 'EMAIL' },
       ]);
 
       mockConfigService.getTemplate.mockResolvedValue({
@@ -83,7 +83,7 @@ describe('NotificationApiService', () => {
         subject: 'New message from {{sender_name}}',
         content: 'Message: {{message_preview}}',
         variables: {},
-        required_fields: ['sender_name', 'message_preview', 'user_email']
+        required_fields: ['sender_name', 'message_preview', 'user_email'],
       });
 
       await service.sendNotification(dto);
@@ -101,11 +101,11 @@ describe('NotificationApiService', () => {
                   channel_name: 'EMAIL',
                   recipient: 'user@example.com',
                   subject: 'New message from John',
-                  content: 'Message: Hello'
-                })
-              ])
-            })
-          })
+                  content: 'Message: Hello',
+                }),
+              ]),
+            }),
+          }),
         ])
       );
     });
@@ -114,31 +114,35 @@ describe('NotificationApiService', () => {
       const dto = {
         notification_id: 'test-123',
         event_type: 'UNKNOWN_EVENT',
-        data: {}
+        data: {},
       };
 
       mockConfigService.getEventInfoByName.mockResolvedValue(null);
 
       await expect(service.sendNotification(dto)).rejects.toThrow(NotFoundException);
-      await expect(service.sendNotification(dto)).rejects.toThrow("Event type 'UNKNOWN_EVENT' not found");
+      await expect(service.sendNotification(dto)).rejects.toThrow(
+        "Event type 'UNKNOWN_EVENT' not found"
+      );
     });
 
     it('should throw BadRequestException when no channels configured', async () => {
       const dto = {
         notification_id: 'test-123',
         event_type: 'CHAT_MESSAGE',
-        data: {}
+        data: {},
       };
 
       mockConfigService.getEventInfoByName.mockResolvedValue({
         eventId: 1,
-        eventName: 'CHAT_MESSAGE'
+        eventName: 'CHAT_MESSAGE',
       });
 
       mockConfigService.getEventChannelMappings.mockResolvedValue([]);
 
       await expect(service.sendNotification(dto)).rejects.toThrow(BadRequestException);
-      await expect(service.sendNotification(dto)).rejects.toThrow("No channels configured for event type 'CHAT_MESSAGE'");
+      await expect(service.sendNotification(dto)).rejects.toThrow(
+        "No channels configured for event type 'CHAT_MESSAGE'"
+      );
     });
 
     it('should throw BadRequestException when required fields are missing', async () => {
@@ -146,18 +150,18 @@ describe('NotificationApiService', () => {
         notification_id: 'test-123',
         event_type: 'CHAT_MESSAGE',
         data: {
-          sender_name: 'John'
+          sender_name: 'John',
           // Missing message_preview and user_email
-        }
+        },
       };
 
       mockConfigService.getEventInfoByName.mockResolvedValue({
         eventId: 1,
-        eventName: 'CHAT_MESSAGE'
+        eventName: 'CHAT_MESSAGE',
       });
 
       mockConfigService.getEventChannelMappings.mockResolvedValue([
-        { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 1, channel_name: 'EMAIL' }
+        { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 1, channel_name: 'EMAIL' },
       ]);
 
       mockConfigService.getTemplate.mockResolvedValue({
@@ -167,11 +171,13 @@ describe('NotificationApiService', () => {
         name: 'Chat Email Template',
         content: 'Test',
         variables: {},
-        required_fields: ['sender_name', 'message_preview', 'user_email']
+        required_fields: ['sender_name', 'message_preview', 'user_email'],
       });
 
       await expect(service.sendNotification(dto)).rejects.toThrow(BadRequestException);
-      await expect(service.sendNotification(dto)).rejects.toThrow('Missing required fields for EMAIL channel');
+      await expect(service.sendNotification(dto)).rejects.toThrow(
+        'Missing required fields for EMAIL channel'
+      );
     });
 
     it('should skip channel when template not found', async () => {
@@ -181,23 +187,25 @@ describe('NotificationApiService', () => {
         data: {
           sender_name: 'John',
           message_preview: 'Hello',
-          user_id: 'user123'
-        }
+          user_id: 'user123',
+        },
       };
 
       mockConfigService.getEventInfoByName.mockResolvedValue({
         eventId: 1,
-        eventName: 'CHAT_MESSAGE'
+        eventName: 'CHAT_MESSAGE',
       });
 
       mockConfigService.getEventChannelMappings.mockResolvedValue([
-        { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 1, channel_name: 'PUSH' }
+        { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 1, channel_name: 'PUSH' },
       ]);
 
       mockConfigService.getTemplate.mockResolvedValue(null);
 
       await expect(service.sendNotification(dto)).rejects.toThrow(BadRequestException);
-      await expect(service.sendNotification(dto)).rejects.toThrow('No valid templates could be rendered');
+      await expect(service.sendNotification(dto)).rejects.toThrow(
+        'No valid templates could be rendered'
+      );
     });
 
     it('should skip channel when recipient not found', async () => {
@@ -206,18 +214,18 @@ describe('NotificationApiService', () => {
         event_type: 'CHAT_MESSAGE',
         data: {
           sender_name: 'John',
-          message_preview: 'Hello'
+          message_preview: 'Hello',
           // Missing user_email
-        }
+        },
       };
 
       mockConfigService.getEventInfoByName.mockResolvedValue({
         eventId: 1,
-        eventName: 'CHAT_MESSAGE'
+        eventName: 'CHAT_MESSAGE',
       });
 
       mockConfigService.getEventChannelMappings.mockResolvedValue([
-        { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 1, channel_name: 'EMAIL' }
+        { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 1, channel_name: 'EMAIL' },
       ]);
 
       mockConfigService.getTemplate.mockResolvedValue({
@@ -227,7 +235,7 @@ describe('NotificationApiService', () => {
         name: 'Chat Email Template',
         content: 'Test',
         variables: {},
-        required_fields: ['sender_name', 'message_preview']
+        required_fields: ['sender_name', 'message_preview'],
       });
 
       await expect(service.sendNotification(dto)).rejects.toThrow(BadRequestException);
@@ -240,17 +248,17 @@ describe('NotificationApiService', () => {
         data: {
           sender_name: 'John Doe',
           message_preview: 'Hello World',
-          user_id: 'user123'
-        }
+          user_id: 'user123',
+        },
       };
 
       mockConfigService.getEventInfoByName.mockResolvedValue({
         eventId: 1,
-        eventName: 'CHAT_MESSAGE'
+        eventName: 'CHAT_MESSAGE',
       });
 
       mockConfigService.getEventChannelMappings.mockResolvedValue([
-        { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 1, channel_name: 'PUSH' }
+        { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 1, channel_name: 'PUSH' },
       ]);
 
       mockConfigService.getTemplate.mockResolvedValue({
@@ -260,7 +268,7 @@ describe('NotificationApiService', () => {
         name: 'Chat Push Template',
         content: '{{sender_name}}: {{message_preview}}',
         variables: {},
-        required_fields: ['sender_name', 'message_preview', 'user_id']
+        required_fields: ['sender_name', 'message_preview', 'user_id'],
       });
 
       await service.sendNotification(dto);
@@ -272,11 +280,11 @@ describe('NotificationApiService', () => {
             value: expect.objectContaining({
               rendered_templates: expect.arrayContaining([
                 expect.objectContaining({
-                  content: 'John Doe: Hello World'
-                })
-              ])
-            })
-          })
+                  content: 'John Doe: Hello World',
+                }),
+              ]),
+            }),
+          }),
         ])
       );
     });
@@ -289,18 +297,18 @@ describe('NotificationApiService', () => {
           sender_name: 'John',
           message_preview: 'Hello',
           user_id: 'user123',
-          user_email: 'user@example.com'
-        }
+          user_email: 'user@example.com',
+        },
       };
 
       mockConfigService.getEventInfoByName.mockResolvedValue({
         eventId: 1,
-        eventName: 'CHAT_MESSAGE'
+        eventName: 'CHAT_MESSAGE',
       });
 
       mockConfigService.getEventChannelMappings.mockResolvedValue([
         { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 1, channel_name: 'EMAIL' },
-        { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 2, channel_name: 'PUSH' }
+        { event_id: 1, event_name: 'CHAT_MESSAGE', channel_id: 2, channel_name: 'PUSH' },
       ]);
 
       mockConfigService.getTemplate
@@ -312,7 +320,7 @@ describe('NotificationApiService', () => {
           subject: 'Test',
           content: 'Content',
           variables: {},
-          required_fields: ['user_email']
+          required_fields: ['user_email'],
         })
         .mockResolvedValueOnce({
           template_id: 2,
@@ -321,7 +329,7 @@ describe('NotificationApiService', () => {
           name: 'Push Template',
           content: 'Content',
           variables: {},
-          required_fields: ['user_id']
+          required_fields: ['user_id'],
         });
 
       await service.sendNotification(dto);
@@ -330,8 +338,8 @@ describe('NotificationApiService', () => {
       const callArgs = (kafkaService.publishMessage as jest.Mock).mock.calls[0];
       const message = callArgs[1][0].value;
       expect(message.rendered_templates).toHaveLength(2);
-      expect(message.rendered_templates.some(t => t.channel_name === 'EMAIL')).toBe(true);
-      expect(message.rendered_templates.some(t => t.channel_name === 'PUSH')).toBe(true);
+      expect(message.rendered_templates.some((t) => t.channel_name === 'EMAIL')).toBe(true);
+      expect(message.rendered_templates.some((t) => t.channel_name === 'PUSH')).toBe(true);
     });
   });
 
@@ -427,4 +435,3 @@ describe('NotificationApiService', () => {
     });
   });
 });
-

@@ -26,11 +26,10 @@ export class DLQReplayWorkerService implements OnModuleInit {
       KAFKA_TOPICS.EMAIL_NOTIFICATION_DLQ,
     ];
 
-    this.logger.log(`Creating consumer for group: dlq-replay-worker-group, topics: ${dlqTopics.join(', ')}`);
-    const consumer = await this.kafkaService.createConsumer(
-      'dlq-replay-worker-group',
-      dlqTopics
+    this.logger.log(
+      `Creating consumer for group: dlq-replay-worker-group, topics: ${dlqTopics.join(', ')}`
     );
+    const consumer = await this.kafkaService.createConsumer('dlq-replay-worker-group', dlqTopics);
 
     this.logger.log('Starting to consume messages from DLQ topics...');
     await this.kafkaService.consumeMessages(consumer, async (payload) => {
@@ -42,15 +41,13 @@ export class DLQReplayWorkerService implements OnModuleInit {
 
   private async replayDLQMessage(payload: any) {
     try {
-      const dlqMessage: DLQMessage = JSON.parse(
-        payload.message.value.toString()
-      );
+      const dlqMessage: DLQMessage = JSON.parse(payload.message.value.toString());
 
       const notificationId = dlqMessage.metadata?.notification_id || 'unknown';
       this.logger.log(
         `Replaying message from DLQ: ${notificationId}, ` +
-        `original topic: ${dlqMessage.originalTopic}, ` +
-        `error: ${dlqMessage.error.message}`
+          `original topic: ${dlqMessage.originalTopic}, ` +
+          `error: ${dlqMessage.error.message}`
       );
 
       // Add delay before replay to avoid immediate retry storms
@@ -65,8 +62,7 @@ export class DLQReplayWorkerService implements OnModuleInit {
       ]);
 
       this.logger.log(
-        `Successfully replayed message ${notificationId} ` +
-        `to ${dlqMessage.originalTopic}`
+        `Successfully replayed message ${notificationId} ` + `to ${dlqMessage.originalTopic}`
       );
     } catch (error) {
       this.logger.error('Error replaying DLQ message:', error);
@@ -75,4 +71,3 @@ export class DLQReplayWorkerService implements OnModuleInit {
     }
   }
 }
-

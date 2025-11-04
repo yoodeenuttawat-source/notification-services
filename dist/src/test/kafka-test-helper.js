@@ -44,9 +44,7 @@ class KafkaTestHelper {
                     topic: payload.topic,
                     partition: payload.partition,
                     key: payload.message.key?.toString() || null,
-                    value: payload.message.value
-                        ? JSON.parse(payload.message.value.toString())
-                        : null,
+                    value: payload.message.value ? JSON.parse(payload.message.value.toString()) : null,
                     timestamp: payload.message.timestamp || '',
                 };
                 const topicMessages = this.messages.get(topic) || [];

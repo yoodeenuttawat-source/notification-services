@@ -4,6 +4,6 @@ import { KafkaService } from './kafka.service';
 @Global()
 @Module({
   providers: [KafkaService],
-  exports: [KafkaService]
+  exports: [KafkaService],
 })
 export class KafkaModule {}

@@ -65,8 +65,8 @@ describe('PushProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'PUSH'
-        }
+          channel_name: 'PUSH',
+        },
       };
 
       const result = await service.sendNotification(payload);
@@ -75,7 +75,10 @@ describe('PushProviderService1', () => {
       expect(result.messageId).toBeDefined();
       expect(result.providerName).toBe('PushProvider1');
       expect(result.provider_request_id).toBe('test-123');
-      expect(circuitBreakerService.recordSuccess).toHaveBeenCalledWith('PushProvider1', expect.any(Object));
+      expect(circuitBreakerService.recordSuccess).toHaveBeenCalledWith(
+        'PushProvider1',
+        expect.any(Object)
+      );
     });
 
     it('should throw CircuitBreakerOpenError when circuit is open', async () => {
@@ -83,7 +86,7 @@ describe('PushProviderService1', () => {
 
       const payload = {
         recipient: 'user123',
-        content: 'Test Content'
+        content: 'Test Content',
       };
 
       await expect(service.sendNotification(payload)).rejects.toThrow(CircuitBreakerOpenError);
@@ -99,8 +102,8 @@ describe('PushProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'PUSH'
-        }
+          channel_name: 'PUSH',
+        },
       };
 
       await service.sendNotification(payload);
@@ -114,9 +117,9 @@ describe('PushProviderService1', () => {
               provider_request_id: 'test-123',
               notification_id: 'test-123',
               provider_name: 'PushProvider1',
-              channel_name: 'PUSH'
-            })
-          })
+              channel_name: 'PUSH',
+            }),
+          }),
         ])
       );
     });
@@ -130,8 +133,8 @@ describe('PushProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'PUSH'
-        }
+          channel_name: 'PUSH',
+        },
       };
 
       await service.sendNotification(payload);
@@ -145,9 +148,9 @@ describe('PushProviderService1', () => {
               notification_id: 'test-123',
               stage: 'provider_success',
               status: 'success',
-              channel_name: 'PUSH'
-            })
-          })
+              channel_name: 'PUSH',
+            }),
+          }),
         ])
       );
     });
@@ -165,8 +168,8 @@ describe('PushProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'PUSH'
-        }
+          channel_name: 'PUSH',
+        },
       };
 
       const request = service['getRequest'](payload);
@@ -176,7 +179,7 @@ describe('PushProviderService1', () => {
         title: 'Test Title',
         body: 'Test Content',
         metadata: { source: 'test' },
-        idempotentKey: 'test-123'
+        idempotentKey: 'test-123',
       });
     });
 
@@ -189,8 +192,8 @@ describe('PushProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'PUSH'
-        }
+          channel_name: 'PUSH',
+        },
       };
 
       const request = service['getRequest'](payload);
@@ -206,8 +209,8 @@ describe('PushProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'PUSH'
-        }
+          channel_name: 'PUSH',
+        },
       };
 
       const request = service['getRequest'](payload);
@@ -225,18 +228,18 @@ describe('PushProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'PUSH'
-        }
+          channel_name: 'PUSH',
+        },
       };
 
       const headers = service['getHeaders'](payload);
 
       expect(headers).toEqual({
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ',
+        Authorization: 'Bearer ',
         'X-Idempotent-Key': 'test-123',
         'X-Provider': 'PushProvider1',
-        'X-Provider-Version': '1.0'
+        'X-Provider-Version': '1.0',
       });
     });
   });
@@ -261,9 +264,9 @@ describe('PushProviderService1', () => {
   describe('getCircuitBreakerState', () => {
     it('should return circuit breaker state', () => {
       mockCircuitBreakerService.getState.mockReturnValue('CLOSED' as any);
-      
+
       const state = service.getCircuitBreakerState();
-      
+
       expect(state).toBe('CLOSED');
       expect(circuitBreakerService.getState).toHaveBeenCalledWith('PushProvider1');
     });
@@ -281,8 +284,8 @@ describe('PushProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'PUSH'
-        }
+          channel_name: 'PUSH',
+        },
       };
 
       const result = await serviceWithoutKafka.sendNotification(payload);
@@ -292,4 +295,3 @@ describe('PushProviderService1', () => {
     });
   });
 });
-

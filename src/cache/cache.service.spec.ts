@@ -199,7 +199,7 @@ describe('CacheService', () => {
     it('should update lastAccessed on get', () => {
       service.set('lru-key', 'value');
       const firstAccess = Date.now();
-      
+
       jest.advanceTimersByTime(1000);
       service.get('lru-key');
       const secondAccess = Date.now();
@@ -302,4 +302,3 @@ describe('CacheService', () => {
     });
   });
 });
-

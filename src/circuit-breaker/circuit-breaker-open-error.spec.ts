@@ -27,4 +27,3 @@ describe('CircuitBreakerOpenError', () => {
     }).toThrow('Test message');
   });
 });
-

@@ -31,13 +31,13 @@ describe('NotificationApiController', () => {
   describe('health', () => {
     it('should return health status', () => {
       const result = controller.health();
-      
+
       expect(result).toEqual({
         status: 'ok',
         service: 'notification-api',
-        timestamp: expect.any(String)
+        timestamp: expect.any(String),
       });
-      
+
       // Verify timestamp is valid ISO string
       expect(() => new Date(result.timestamp)).not.toThrow();
     });
@@ -46,7 +46,7 @@ describe('NotificationApiController', () => {
       const before = Date.now();
       const result = controller.health();
       const after = Date.now();
-      
+
       const timestamp = new Date(result.timestamp).getTime();
       expect(timestamp).toBeGreaterThanOrEqual(before);
       expect(timestamp).toBeLessThanOrEqual(after);
@@ -62,8 +62,8 @@ describe('NotificationApiController', () => {
           sender_name: 'John',
           message_preview: 'Hello',
           user_id: 'user123',
-          user_email: 'user@example.com'
-        }
+          user_email: 'user@example.com',
+        },
       };
 
       const result = await controller.sendNotification(dto);
@@ -72,7 +72,7 @@ describe('NotificationApiController', () => {
       expect(result).toEqual({
         success: true,
         notification_id: 'test-123',
-        message: 'Notification accepted and queued for processing'
+        message: 'Notification accepted and queued for processing',
       });
     });
 
@@ -80,7 +80,7 @@ describe('NotificationApiController', () => {
       const dto: SendNotificationDto = {
         notification_id: 'test-123',
         event_type: 'UNKNOWN',
-        data: {}
+        data: {},
       };
 
       const error = new Error('Event type not found');
@@ -91,4 +91,3 @@ describe('NotificationApiController', () => {
     });
   });
 });
-

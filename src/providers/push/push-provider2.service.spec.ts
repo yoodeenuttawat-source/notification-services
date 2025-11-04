@@ -64,8 +64,8 @@ describe('PushProviderService2', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'PUSH'
-        }
+          channel_name: 'PUSH',
+        },
       };
 
       const result = await service.sendNotification(payload);
@@ -74,7 +74,10 @@ describe('PushProviderService2', () => {
       expect(result.messageId).toBeDefined();
       expect(result.providerName).toBe('PushProvider2');
       expect(result.provider_request_id).toBe('test-123');
-      expect(circuitBreakerService.recordSuccess).toHaveBeenCalledWith('PushProvider2', expect.any(Object));
+      expect(circuitBreakerService.recordSuccess).toHaveBeenCalledWith(
+        'PushProvider2',
+        expect.any(Object)
+      );
     });
 
     it('should throw CircuitBreakerOpenError when circuit is open', async () => {
@@ -82,7 +85,7 @@ describe('PushProviderService2', () => {
 
       const payload = {
         recipient: 'user123',
-        content: 'Test Content'
+        content: 'Test Content',
       };
 
       await expect(service.sendNotification(payload)).rejects.toThrow(CircuitBreakerOpenError);
@@ -103,9 +106,9 @@ describe('PushProviderService2', () => {
   describe('getCircuitBreakerState', () => {
     it('should return circuit breaker state', () => {
       mockCircuitBreakerService.getState.mockReturnValue('CLOSED' as any);
-      
+
       const state = service.getCircuitBreakerState();
-      
+
       expect(state).toBe('CLOSED');
       expect(circuitBreakerService.getState).toHaveBeenCalledWith('PushProvider2');
     });
@@ -123,8 +126,8 @@ describe('PushProviderService2', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'PUSH'
-        }
+          channel_name: 'PUSH',
+        },
       };
 
       const result = await serviceWithoutKafka.sendNotification(payload);
@@ -134,4 +137,3 @@ describe('PushProviderService2', () => {
     });
   });
 });
-

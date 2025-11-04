@@ -34,27 +34,28 @@ export class CacheService implements OnModuleInit {
       this.inMemoryCache.set(key, cached);
       return cached.data as T;
     }
-    
+
     // Remove expired entry
     if (cached) {
       this.inMemoryCache.delete(key);
     }
-    
+
     return null;
   }
 
   set(key: string, value: any, ttlSeconds?: number): void {
     // If ttlSeconds is 0 or undefined, set expiresAt to a very large number (effectively never expires)
-    const expiresAt = ttlSeconds === undefined || ttlSeconds === 0
-      ? Number.MAX_SAFE_INTEGER
-      : Date.now() + ttlSeconds * 1000;
+    const expiresAt =
+      ttlSeconds === undefined || ttlSeconds === 0
+        ? Number.MAX_SAFE_INTEGER
+        : Date.now() + ttlSeconds * 1000;
 
     // Check if key already exists (update case)
     if (this.inMemoryCache.has(key)) {
       this.inMemoryCache.set(key, {
         data: value,
         expiresAt: expiresAt,
-        lastAccessed: Date.now()
+        lastAccessed: Date.now(),
       });
       // Move to end (most recently used)
       const entry = this.inMemoryCache.get(key)!;
@@ -72,7 +73,7 @@ export class CacheService implements OnModuleInit {
     this.inMemoryCache.set(key, {
       data: value,
       expiresAt: expiresAt,
-      lastAccessed: Date.now()
+      lastAccessed: Date.now(),
     });
   }
 
@@ -95,14 +96,14 @@ export class CacheService implements OnModuleInit {
   private cleanupExpiredEntries(): void {
     const now = Date.now();
     let cleaned = 0;
-    
+
     for (const [key, entry] of this.inMemoryCache.entries()) {
       if (entry.expiresAt <= now) {
         this.inMemoryCache.delete(key);
         cleaned++;
       }
     }
-    
+
     if (cleaned > 0) {
       this.logger.debug(`Cleaned up ${cleaned} expired cache entries`);
     }
@@ -116,14 +117,15 @@ export class CacheService implements OnModuleInit {
     const currentSize = this.inMemoryCache.size;
     const targetSize = Math.floor(this.maxSize * 0.9); // Evict to 90% of max size
     const entriesToEvict = currentSize - targetSize;
-    
+
     if (entriesToEvict <= 0) {
       return;
     }
 
     // Sort entries by lastAccessed time (oldest first)
-    const entries = Array.from(this.inMemoryCache.entries())
-      .sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+    const entries = Array.from(this.inMemoryCache.entries()).sort(
+      (a, b) => a[1].lastAccessed - b[1].lastAccessed
+    );
 
     // Evict oldest entries
     let evicted = 0;
@@ -146,7 +148,7 @@ export class CacheService implements OnModuleInit {
     return {
       size: this.inMemoryCache.size,
       maxSize: this.maxSize,
-      keys: Array.from(this.inMemoryCache.keys())
+      keys: Array.from(this.inMemoryCache.keys()),
     };
   }
 }

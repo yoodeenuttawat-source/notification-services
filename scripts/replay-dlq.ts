@@ -1,4 +1,4 @@
-import { Kafka, Consumer } from 'kafkajs';
+import { Kafka, Consumer, Partitioners } from 'kafkajs';
 import { getKafkaConfig } from '../src/kafka/kafka.config';
 import { KAFKA_TOPICS } from '../src/kafka/kafka.config';
 import { DLQMessage } from '../src/kafka/types/dlq-message';
@@ -24,6 +24,7 @@ async function replayDLQ() {
 
   const producer = kafka.producer({
     allowAutoTopicCreation: true,
+    createPartitioner: Partitioners.LegacyPartitioner,
   });
 
   await producer.connect();
@@ -68,9 +69,7 @@ async function replayDLQ() {
       }
 
       try {
-        const dlqMessage: DLQMessage = JSON.parse(
-          payload.message.value.toString()
-        );
+        const dlqMessage: DLQMessage = JSON.parse(payload.message.value.toString());
 
         const notificationId = dlqMessage.metadata?.notification_id || 'unknown';
 
@@ -119,4 +118,3 @@ replayDLQ().catch((error) => {
   console.error('Error replaying DLQ:', error);
   process.exit(1);
 });
-

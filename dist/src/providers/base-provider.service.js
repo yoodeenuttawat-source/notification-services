@@ -34,10 +34,10 @@ class BaseProviderService {
                     request_header: headers,
                     response: JSON.stringify({
                         success: true,
-                        messageId: result.messageId
+                        messageId: result.messageId,
                     }),
                     request_timestamp: requestTimestamp,
-                    response_timestamp: responseTimestamp
+                    response_timestamp: responseTimestamp,
                 });
                 await this.publishDeliveryLog({
                     notification_id: payload.context.notification_id,
@@ -48,13 +48,13 @@ class BaseProviderService {
                     stage: 'provider_success',
                     status: 'success',
                     message_id: result.messageId,
-                    provider_request_id: providerRequestId
+                    provider_request_id: providerRequestId,
                 });
             }
             return {
                 ...result,
                 providerName: this.providerName,
-                provider_request_id: providerRequestId
+                provider_request_id: providerRequestId,
             };
         }
         catch (error) {
@@ -77,11 +77,11 @@ class BaseProviderService {
                         error: {
                             message: errorObj.message,
                             stack: errorObj.stack,
-                            type: errorObj.constructor.name
-                        }
+                            type: errorObj.constructor.name,
+                        },
                     }),
                     request_timestamp: requestTimestamp,
-                    response_timestamp: responseTimestamp
+                    response_timestamp: responseTimestamp,
                 });
             }
             throw error;
@@ -93,13 +93,13 @@ class BaseProviderService {
         }
         const providerResponse = {
             ...response,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         };
         await this.kafkaService.publishMessage(kafka_config_1.KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE, [
             {
                 key: response.provider_request_id,
-                value: providerResponse
-            }
+                value: providerResponse,
+            },
         ]);
     }
     async publishDeliveryLog(log) {
@@ -108,13 +108,13 @@ class BaseProviderService {
         }
         const deliveryLog = {
             ...log,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         };
         await this.kafkaService.publishMessage(kafka_config_1.KAFKA_TOPICS.DELIVERY_LOGS, [
             {
                 key: log.notification_id,
-                value: deliveryLog
-            }
+                value: deliveryLog,
+            },
         ]);
     }
     getCircuitBreakerState() {

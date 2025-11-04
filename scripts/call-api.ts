@@ -22,16 +22,12 @@ async function sendNotification(payload: NotificationPayload): Promise<void> {
     console.log(`\n📤 Sending notification: ${payload.notification_id}`);
     console.log(`   Event Type: ${payload.event_type}`);
     console.log(`   Data:`, JSON.stringify(payload.data, null, 2));
-    
-    const response = await axios.post(
-      `${API_BASE_URL}/notifications/send`,
-      payload,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+
+    const response = await axios.post(`${API_BASE_URL}/notifications/send`, payload, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
     console.log(`✅ Success! Status: ${response.status}`);
     console.log(`   Response:`, JSON.stringify(response.data, null, 2));
@@ -129,7 +125,7 @@ async function main() {
   }
 
   const payload = examples[eventType as keyof typeof examples];
-  
+
   try {
     await sendNotification(payload);
     console.log(`\n✅ Notification sent successfully!`);
@@ -145,4 +141,3 @@ if (require.main === module) {
 }
 
 export { sendNotification, examples };
-

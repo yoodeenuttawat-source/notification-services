@@ -41,7 +41,9 @@ let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService extends
     async onModuleInit() {
         this.logger.log('Initializing email worker...');
         this.logger.log(`Creating consumer for group: email-worker-group, topics: ${kafka_config_1.KAFKA_TOPICS.EMAIL_NOTIFICATION}`);
-        const consumer = await this.kafkaService.createConsumer('email-worker-group', [kafka_config_1.KAFKA_TOPICS.EMAIL_NOTIFICATION]);
+        const consumer = await this.kafkaService.createConsumer('email-worker-group', [
+            kafka_config_1.KAFKA_TOPICS.EMAIL_NOTIFICATION,
+        ]);
         this.logger.log('Starting to consume messages from email notification topic...');
         await this.kafkaService.consumeMessages(consumer, async (payload) => {
             await this.processEmailNotification(payload);
@@ -59,7 +61,7 @@ let EmailWorkerService = EmailWorkerService_1 = class EmailWorkerService extends
                 return;
             }
             this.markAsProcessed(message.notification_id);
-            if (!await this.validateEmailMessage(message))
+            if (!(await this.validateEmailMessage(message)))
                 return;
             const providers = await this.getProviders(message.channel_id);
             if (!providers || providers.length === 0) {

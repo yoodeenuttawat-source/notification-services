@@ -13,7 +13,8 @@ describe('RetryHelper', () => {
 
     it('should retry on failure and succeed', async () => {
       jest.useFakeTimers({ advanceTimers: true });
-      const fn = jest.fn()
+      const fn = jest
+        .fn()
         .mockRejectedValueOnce(new Error('First attempt failed'))
         .mockResolvedValueOnce('success');
 
@@ -31,7 +32,8 @@ describe('RetryHelper', () => {
 
     it('should retry multiple times with exponential backoff', async () => {
       jest.useFakeTimers({ advanceTimers: true });
-      const fn = jest.fn()
+      const fn = jest
+        .fn()
         .mockRejectedValueOnce(new Error('Attempt 1 failed'))
         .mockRejectedValueOnce(new Error('Attempt 2 failed'))
         .mockResolvedValueOnce('success');
@@ -65,7 +67,8 @@ describe('RetryHelper', () => {
 
     it('should use custom backoff multiplier', async () => {
       jest.useFakeTimers({ advanceTimers: true });
-      const fn = jest.fn()
+      const fn = jest
+        .fn()
         .mockRejectedValueOnce(new Error('Failed'))
         .mockResolvedValueOnce('success');
 
@@ -125,4 +128,3 @@ describe('RetryHelper', () => {
     });
   });
 });
-

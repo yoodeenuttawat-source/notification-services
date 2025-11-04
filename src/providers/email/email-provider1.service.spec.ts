@@ -66,8 +66,8 @@ describe('EmailProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       const result = await service.sendNotification(payload);
@@ -76,7 +76,10 @@ describe('EmailProviderService1', () => {
       expect(result.messageId).toBeDefined();
       expect(result.providerName).toBe('EmailProvider1');
       expect(result.provider_request_id).toBe('test-123');
-      expect(circuitBreakerService.recordSuccess).toHaveBeenCalledWith('EmailProvider1', expect.any(Object));
+      expect(circuitBreakerService.recordSuccess).toHaveBeenCalledWith(
+        'EmailProvider1',
+        expect.any(Object)
+      );
     });
 
     it('should throw CircuitBreakerOpenError when circuit is open', async () => {
@@ -85,7 +88,7 @@ describe('EmailProviderService1', () => {
       const payload = {
         recipient: 'test@example.com',
         subject: 'Test Subject',
-        content: 'Test Content'
+        content: 'Test Content',
       };
 
       await expect(service.sendNotification(payload)).rejects.toThrow(CircuitBreakerOpenError);
@@ -101,8 +104,8 @@ describe('EmailProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       await expect(service.sendNotification(payload)).rejects.toThrow('Email requires subject');
@@ -119,8 +122,8 @@ describe('EmailProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       await service.sendNotification(payload);
@@ -134,9 +137,9 @@ describe('EmailProviderService1', () => {
               provider_request_id: 'test-123',
               notification_id: 'test-123',
               provider_name: 'EmailProvider1',
-              channel_name: 'EMAIL'
-            })
-          })
+              channel_name: 'EMAIL',
+            }),
+          }),
         ])
       );
     });
@@ -151,8 +154,8 @@ describe('EmailProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       await service.sendNotification(payload);
@@ -166,9 +169,9 @@ describe('EmailProviderService1', () => {
               notification_id: 'test-123',
               stage: 'provider_success',
               status: 'success',
-              channel_name: 'EMAIL'
-            })
-          })
+              channel_name: 'EMAIL',
+            }),
+          }),
         ])
       );
     });
@@ -182,8 +185,8 @@ describe('EmailProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       await expect(service.sendNotification(payload)).rejects.toThrow();
@@ -196,9 +199,9 @@ describe('EmailProviderService1', () => {
             key: 'test-123',
             value: expect.objectContaining({
               provider_name: 'EmailProvider1',
-              response: expect.stringContaining('false') // Error response has success: false
-            })
-          })
+              response: expect.stringContaining('false'), // Error response has success: false
+            }),
+          }),
         ])
       );
     });
@@ -216,8 +219,8 @@ describe('EmailProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       const result = await serviceWithoutKafka.sendNotification(payload);
@@ -230,7 +233,7 @@ describe('EmailProviderService1', () => {
       const payload = {
         recipient: 'test@example.com',
         subject: 'Test Subject',
-        content: 'Test Content'
+        content: 'Test Content',
         // No context
       };
 
@@ -239,7 +242,7 @@ describe('EmailProviderService1', () => {
       expect(result.success).toBe(true);
       // Should not publish provider response or delivery log without context
       const providerResponseCalls = (kafkaService.publishMessage as jest.Mock).mock.calls.filter(
-        call => call[0] === KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE
+        (call) => call[0] === KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE
       );
       expect(providerResponseCalls.length).toBe(0);
     });
@@ -255,8 +258,8 @@ describe('EmailProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       await expect(serviceWithoutKafka.sendNotification(payload)).rejects.toThrow();
@@ -277,8 +280,8 @@ describe('EmailProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       const result = await serviceWithoutKafka.sendNotification(payload);
@@ -286,7 +289,7 @@ describe('EmailProviderService1', () => {
       expect(result.success).toBe(true);
       // Should not publish delivery log without kafkaService
       const deliveryLogCalls = (kafkaService.publishMessage as jest.Mock).mock.calls.filter(
-        call => call[0] === KAFKA_TOPICS.DELIVERY_LOGS
+        (call) => call[0] === KAFKA_TOPICS.DELIVERY_LOGS
       );
       expect(deliveryLogCalls.length).toBe(0);
     });
@@ -304,8 +307,8 @@ describe('EmailProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       const request = service['getRequest'](payload);
@@ -317,7 +320,7 @@ describe('EmailProviderService1', () => {
         metadata: { source: 'test' },
         idempotentKey: 'test-123',
         from: 'noreply@example.com',
-        to: 'test@example.com'
+        to: 'test@example.com',
       });
     });
 
@@ -331,8 +334,8 @@ describe('EmailProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       const request = service['getRequest'](payload);
@@ -343,7 +346,7 @@ describe('EmailProviderService1', () => {
       const payload = {
         recipient: 'test@example.com',
         subject: 'Test',
-        content: 'Content'
+        content: 'Content',
       };
 
       const request = service['getRequest'](payload);
@@ -362,18 +365,18 @@ describe('EmailProviderService1', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       const headers = service['getHeaders'](payload);
 
       expect(headers).toEqual({
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ',
+        Authorization: 'Bearer ',
         'X-Idempotent-Key': 'test-123',
         'X-Provider': 'EmailProvider1',
-        'X-Provider-Version': '1.0'
+        'X-Provider-Version': '1.0',
       });
     });
   });
@@ -398,12 +401,11 @@ describe('EmailProviderService1', () => {
   describe('getCircuitBreakerState', () => {
     it('should return circuit breaker state', () => {
       mockCircuitBreakerService.getState.mockReturnValue('OPEN' as any);
-      
+
       const state = service.getCircuitBreakerState();
-      
+
       expect(state).toBe('OPEN');
       expect(circuitBreakerService.getState).toHaveBeenCalledWith('EmailProvider1');
     });
   });
 });
-

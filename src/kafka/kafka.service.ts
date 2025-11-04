@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { Kafka, Producer, Consumer, EachMessagePayload } from 'kafkajs';
+import { Kafka, Producer, Consumer, EachMessagePayload, Partitioners } from 'kafkajs';
 import { getKafkaConfig } from './kafka.config';
 
 @Injectable()
@@ -14,7 +14,8 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
     this.kafka = new Kafka(config);
     this.producer = this.kafka.producer({
       allowAutoTopicCreation: true,
-      transactionTimeout: 30000
+      transactionTimeout: 30000,
+      createPartitioner: Partitioners.LegacyPartitioner,
     });
   }
 
@@ -28,7 +29,7 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
     for (const consumer of this.consumers.values()) {
       await consumer.disconnect();
     }
-    
+
     await this.producer.disconnect();
     this.logger.log('Kafka producer disconnected');
   }
@@ -36,14 +37,17 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
   /**
    * Publish message to a topic
    */
-  async publishMessage<T>(topic: string, messages: Array<{ key?: string; value: T }>): Promise<void> {
+  async publishMessage<T>(
+    topic: string,
+    messages: Array<{ key?: string; value: T }>
+  ): Promise<void> {
     try {
       await this.producer.send({
         topic,
         messages: messages.map((msg) => ({
           key: msg.key,
-          value: JSON.stringify(msg.value)
-        }))
+          value: JSON.stringify(msg.value),
+        })),
       });
       this.logger.debug(`Published ${messages.length} message(s) to topic: ${topic}`);
     } catch (error) {
@@ -59,7 +63,7 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
     const consumer = this.kafka.consumer({
       groupId,
       sessionTimeout: 30000,
-      heartbeatInterval: 3000
+      heartbeatInterval: 3000,
     });
 
     await consumer.connect();
@@ -67,7 +71,7 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
 
     this.consumers.set(groupId, consumer);
     this.logger.log(`Consumer created for group: ${groupId}, topics: ${topics.join(', ')}`);
-    
+
     return consumer;
   }
 
@@ -86,7 +90,7 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
           this.logger.error('Error processing message:', error);
           // You might want to handle errors differently (DLQ, retry, etc.)
         }
-      }
+      },
     });
   }
 

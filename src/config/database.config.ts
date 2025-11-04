@@ -16,6 +16,6 @@ export const getDatabaseConfig = (): DatabaseConfig => {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
     ssl: process.env.DB_SSL === 'true',
-    max: parseInt(process.env.DB_MAX_CONNECTIONS || '20', 10)
+    max: parseInt(process.env.DB_MAX_CONNECTIONS || '20', 10),
   };
 };

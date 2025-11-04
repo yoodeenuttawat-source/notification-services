@@ -4,6 +4,6 @@ import { CircuitBreakerService } from '../circuit-breaker/CircuitBreakerService'
 
 @Module({
   providers: [CircuitBreakerService, ProviderFactoryService],
-  exports: [ProviderFactoryService, CircuitBreakerService]
+  exports: [ProviderFactoryService, CircuitBreakerService],
 })
 export class ProvidersModule {}

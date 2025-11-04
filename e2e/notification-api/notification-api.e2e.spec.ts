@@ -7,11 +7,11 @@ import { KAFKA_TOPICS } from '../../src/kafka/kafka.config';
 import { NotificationMessage } from '../../src/kafka/types/notification-message';
 import { ChannelMessage } from '../../src/kafka/types/channel-message';
 import { DeliveryLog } from '../../src/kafka/types/delivery-log';
-import { ProviderRequestResponse } from '../../src/kafka/types/provider-response';
+import { ProviderRequestResponse } from '../../src/kafka/types/provider-request-response';
 
 /**
  * Integration tests for Notification API
- * 
+ *
  * These tests verify:
  * - API endpoint functionality
  * - Messages are published to Kafka 'notification' topic
@@ -19,7 +19,7 @@ import { ProviderRequestResponse } from '../../src/kafka/types/provider-response
  * - Message structure and content validation
  * - Template rendering for different event types
  * - Channel routing information (PUSH/EMAIL) in templates
- * 
+ *
  * Note: Routing to 'notification.push' and 'notification.email' topics
  * happens in the notification worker. The tests require messages to be present
  * in those topics, so the notification worker must be running for these tests
@@ -38,14 +38,11 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       KAFKA_TOPICS.NOTIFICATION,
       'test-notification-consumer'
     );
-    
+
     // Note: Consumers for PUSH_NOTIFICATION, EMAIL_NOTIFICATION, and DELIVERY_LOGS
     // are created but won't receive messages unless the notification worker is running.
     // These are set up for potential future full end-to-end tests.
-    await kafkaHelper.createConsumerForTopic(
-      KAFKA_TOPICS.PUSH_NOTIFICATION,
-      'test-push-consumer'
-    );
+    await kafkaHelper.createConsumerForTopic(KAFKA_TOPICS.PUSH_NOTIFICATION, 'test-push-consumer');
     await kafkaHelper.createConsumerForTopic(
       KAFKA_TOPICS.EMAIL_NOTIFICATION,
       'test-email-consumer'
@@ -150,11 +147,11 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         source: 'chat_service',
         user_id: 'user123',
       });
-      
+
       expect(messageValue.rendered_templates).toHaveLength(2);
       expect(messageValue.rendered_templates.some((t) => t.channel_name === 'PUSH')).toBe(true);
       expect(messageValue.rendered_templates.some((t) => t.channel_name === 'EMAIL')).toBe(true);
-      
+
       // Verify template details for PUSH
       const pushTemplate = messageValue.rendered_templates.find((t) => t.channel_name === 'PUSH');
       expect(pushTemplate).toBeDefined();
@@ -164,7 +161,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       expect(typeof pushTemplate?.template_name).toBe('string');
       expect(pushTemplate?.recipient).toBe('user123');
       expect(pushTemplate?.content).toBe('New message from John Doe: Hello, how are you?');
-      
+
       // Verify template details for EMAIL
       const emailTemplate = messageValue.rendered_templates.find((t) => t.channel_name === 'EMAIL');
       expect(emailTemplate).toBeDefined();
@@ -209,7 +206,8 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const emailMessage = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.EMAIL_NOTIFICATION,
         15000,
-        (msg) => msg.value?.notification_id === notificationId && msg.value?.channel_name === 'EMAIL'
+        (msg) =>
+          msg.value?.notification_id === notificationId && msg.value?.channel_name === 'EMAIL'
       );
       expect(emailMessage).toBeTruthy();
       expect(emailMessage?.topic).toBe(KAFKA_TOPICS.EMAIL_NOTIFICATION);
@@ -220,7 +218,8 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         event_name: 'CHAT_MESSAGE',
         channel_name: 'EMAIL',
         recipient: 'jane@example.com',
-        template_content: '<h1>New Message</h1><p>Hi Jane Doe,</p><p>You have a new message from John Doe:</p><p>Hello, how are you?</p>',
+        template_content:
+          '<h1>New Message</h1><p>Hi Jane Doe,</p><p>You have a new message from John Doe:</p><p>Hello, how are you?</p>',
         template_subject: 'New Message from John Doe',
       });
       expect(emailValue.event_id).toBeGreaterThan(0);
@@ -241,9 +240,10 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const pushDeliveryLog = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.DELIVERY_LOGS,
         15000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'PUSH' && 
-                 msg.value?.stage === 'routed'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.channel_name === 'PUSH' &&
+          msg.value?.stage === 'routed'
       );
       expect(pushDeliveryLog).toBeTruthy();
       const pushLogValue: DeliveryLog = pushDeliveryLog!.value;
@@ -268,9 +268,10 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const emailDeliveryLog = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.DELIVERY_LOGS,
         15000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'EMAIL' && 
-                 msg.value?.stage === 'routed'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.channel_name === 'EMAIL' &&
+          msg.value?.stage === 'routed'
       );
       expect(emailDeliveryLog).toBeTruthy();
       const emailLogValue: DeliveryLog = emailDeliveryLog!.value;
@@ -296,10 +297,11 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const pushSuccessLog = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.DELIVERY_LOGS,
         20000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'PUSH' && 
-                 msg.value?.stage === 'provider_success' &&
-                 msg.value?.status === 'success'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.channel_name === 'PUSH' &&
+          msg.value?.stage === 'provider_success' &&
+          msg.value?.status === 'success'
       );
       expect(pushSuccessLog).toBeTruthy();
       const pushSuccessValue: DeliveryLog = pushSuccessLog!.value;
@@ -326,10 +328,11 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const emailSuccessLog = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.DELIVERY_LOGS,
         20000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'EMAIL' && 
-                 msg.value?.stage === 'provider_success' &&
-                 msg.value?.status === 'success'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.channel_name === 'EMAIL' &&
+          msg.value?.stage === 'provider_success' &&
+          msg.value?.status === 'success'
       );
       expect(emailSuccessLog).toBeTruthy();
       const emailSuccessValue: DeliveryLog = emailSuccessLog!.value;
@@ -355,8 +358,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const pushProviderResponse = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE,
         20000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'PUSH'
+        (msg) => msg.value?.notification_id === notificationId && msg.value?.channel_name === 'PUSH'
       );
       expect(pushProviderResponse).toBeTruthy();
       const pushProviderValue: ProviderRequestResponse = pushProviderResponse!.value;
@@ -372,7 +374,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       expect(pushProviderValue.timestamp).toBeDefined();
       expect(typeof pushProviderValue.timestamp).toBe('string');
       expect(() => new Date(pushProviderValue.timestamp)).not.toThrow();
-      
+
       // Verify request structure (parsed from JSON string)
       const pushRequest = JSON.parse(pushProviderValue.request);
       expect(pushRequest).toMatchObject({
@@ -385,7 +387,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
           user_id: 'user123',
         },
       });
-      
+
       // Verify headers structure
       expect(pushProviderValue.request_header).toMatchObject({
         'Content-Type': 'application/json',
@@ -393,7 +395,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         'X-Provider': 'PushProvider1',
         'X-Provider-Version': '1.0',
       });
-      
+
       // Verify response structure (parsed from JSON string)
       const pushResponse = JSON.parse(pushProviderValue.response);
       expect(pushResponse).toMatchObject({
@@ -401,7 +403,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       });
       expect(pushResponse.messageId).toBeDefined();
       expect(typeof pushResponse.messageId).toBe('string');
-      
+
       expect(pushProviderValue.request_timestamp).toBeDefined();
       expect(typeof pushProviderValue.request_timestamp).toBe('string');
       expect(() => new Date(pushProviderValue.request_timestamp)).not.toThrow();
@@ -422,8 +424,8 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const emailProviderResponse = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE,
         20000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'EMAIL'
+        (msg) =>
+          msg.value?.notification_id === notificationId && msg.value?.channel_name === 'EMAIL'
       );
       expect(emailProviderResponse).toBeTruthy();
       const emailProviderValue: ProviderRequestResponse = emailProviderResponse!.value;
@@ -439,13 +441,14 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       expect(emailProviderValue.timestamp).toBeDefined();
       expect(typeof emailProviderValue.timestamp).toBe('string');
       expect(() => new Date(emailProviderValue.timestamp)).not.toThrow();
-      
+
       // Verify request structure (parsed from JSON string)
       const emailRequest = JSON.parse(emailProviderValue.request);
       expect(emailRequest).toMatchObject({
         recipient: 'jane@example.com',
         subject: 'New Message from John Doe',
-        content: '<h1>New Message</h1><p>Hi Jane Doe,</p><p>You have a new message from John Doe:</p><p>Hello, how are you?</p>',
+        content:
+          '<h1>New Message</h1><p>Hi Jane Doe,</p><p>You have a new message from John Doe:</p><p>Hello, how are you?</p>',
         idempotentKey: notificationId,
         from: 'noreply@example.com',
         to: 'jane@example.com',
@@ -454,7 +457,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
           user_id: 'user123',
         },
       });
-      
+
       // Verify headers structure
       expect(emailProviderValue.request_header).toMatchObject({
         'Content-Type': 'application/json',
@@ -462,7 +465,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         'X-Provider': 'EmailProvider1',
         'X-Provider-Version': '1.0',
       });
-      
+
       // Verify response structure (parsed from JSON string)
       const emailResponse = JSON.parse(emailProviderValue.response);
       expect(emailResponse).toMatchObject({
@@ -470,7 +473,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       });
       expect(emailResponse.messageId).toBeDefined();
       expect(typeof emailResponse.messageId).toBe('string');
-      
+
       expect(emailProviderValue.request_timestamp).toBeDefined();
       expect(typeof emailProviderValue.request_timestamp).toBe('string');
       expect(() => new Date(emailProviderValue.request_timestamp)).not.toThrow();
@@ -540,7 +543,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       expect(messageValue.rendered_templates).toHaveLength(2);
       expect(messageValue.rendered_templates.some((t) => t.channel_name === 'PUSH')).toBe(true);
       expect(messageValue.rendered_templates.some((t) => t.channel_name === 'EMAIL')).toBe(true);
-      
+
       // Verify template details for PUSH
       const pushTemplate = messageValue.rendered_templates.find((t) => t.channel_name === 'PUSH');
       expect(pushTemplate).toBeDefined();
@@ -549,7 +552,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       expect(pushTemplate?.template_name).toBeDefined();
       expect(typeof pushTemplate?.template_name).toBe('string');
       expect(pushTemplate?.recipient).toBe('user123');
-      
+
       // Verify template details for EMAIL
       const emailTemplate = messageValue.rendered_templates.find((t) => t.channel_name === 'EMAIL');
       expect(emailTemplate).toBeDefined();
@@ -593,7 +596,8 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const emailMessage = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.EMAIL_NOTIFICATION,
         15000,
-        (msg) => msg.value?.notification_id === notificationId && msg.value?.channel_name === 'EMAIL'
+        (msg) =>
+          msg.value?.notification_id === notificationId && msg.value?.channel_name === 'EMAIL'
       );
       expect(emailMessage).toBeTruthy();
       expect(emailMessage?.topic).toBe(KAFKA_TOPICS.EMAIL_NOTIFICATION);
@@ -604,7 +608,8 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         event_name: 'PURCHASE',
         channel_name: 'EMAIL',
         recipient: 'jane@example.com',
-        template_content: '<h1>Purchase Confirmed</h1><p>Hi Jane Doe,</p><p>Your purchase #ORD123 has been confirmed!</p><p>Total: 99.99</p>',
+        template_content:
+          '<h1>Purchase Confirmed</h1><p>Hi Jane Doe,</p><p>Your purchase #ORD123 has been confirmed!</p><p>Total: 99.99</p>',
         template_subject: 'Purchase Confirmation - Order #ORD123',
       });
       expect(emailValue.event_id).toBeGreaterThan(0);
@@ -625,9 +630,10 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const pushDeliveryLog = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.DELIVERY_LOGS,
         15000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'PUSH' && 
-                 msg.value?.stage === 'routed'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.channel_name === 'PUSH' &&
+          msg.value?.stage === 'routed'
       );
       expect(pushDeliveryLog).toBeTruthy();
       const pushLogValue: DeliveryLog = pushDeliveryLog!.value;
@@ -652,9 +658,10 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const emailDeliveryLog = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.DELIVERY_LOGS,
         15000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'EMAIL' && 
-                 msg.value?.stage === 'routed'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.channel_name === 'EMAIL' &&
+          msg.value?.stage === 'routed'
       );
       expect(emailDeliveryLog).toBeTruthy();
       const emailLogValue: DeliveryLog = emailDeliveryLog!.value;
@@ -679,10 +686,11 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const pushSuccessLog = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.DELIVERY_LOGS,
         20000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'PUSH' && 
-                 msg.value?.stage === 'provider_success' &&
-                 msg.value?.status === 'success'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.channel_name === 'PUSH' &&
+          msg.value?.stage === 'provider_success' &&
+          msg.value?.status === 'success'
       );
       expect(pushSuccessLog).toBeTruthy();
       const pushSuccessValue: DeliveryLog = pushSuccessLog!.value;
@@ -708,10 +716,11 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const emailSuccessLog = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.DELIVERY_LOGS,
         20000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'EMAIL' && 
-                 msg.value?.stage === 'provider_success' &&
-                 msg.value?.status === 'success'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.channel_name === 'EMAIL' &&
+          msg.value?.stage === 'provider_success' &&
+          msg.value?.status === 'success'
       );
       expect(emailSuccessLog).toBeTruthy();
       const emailSuccessValue: DeliveryLog = emailSuccessLog!.value;
@@ -737,8 +746,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const pushProviderResponse = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE,
         20000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'PUSH'
+        (msg) => msg.value?.notification_id === notificationId && msg.value?.channel_name === 'PUSH'
       );
       expect(pushProviderResponse).toBeTruthy();
       const pushProviderValue: ProviderRequestResponse = pushProviderResponse!.value;
@@ -780,8 +788,8 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const emailProviderResponse = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE,
         20000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'EMAIL'
+        (msg) =>
+          msg.value?.notification_id === notificationId && msg.value?.channel_name === 'EMAIL'
       );
       expect(emailProviderResponse).toBeTruthy();
       const emailProviderValue: ProviderRequestResponse = emailProviderResponse!.value;
@@ -866,7 +874,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       expect(messageValue.rendered_templates).toHaveLength(1);
       expect(messageValue.rendered_templates[0].channel_name).toBe('PUSH');
       expect(messageValue.rendered_templates.some((t) => t.channel_name === 'EMAIL')).toBe(false);
-      
+
       // Verify template details for PUSH
       const pushTemplate = messageValue.rendered_templates[0];
       expect(pushTemplate.channel_id).toBeGreaterThan(0);
@@ -908,9 +916,10 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const pushDeliveryLog = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.DELIVERY_LOGS,
         15000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'PUSH' && 
-                 msg.value?.stage === 'routed'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.channel_name === 'PUSH' &&
+          msg.value?.stage === 'routed'
       );
       expect(pushDeliveryLog).toBeTruthy();
       const pushLogValue: DeliveryLog = pushDeliveryLog!.value;
@@ -935,10 +944,11 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const pushSuccessLog = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.DELIVERY_LOGS,
         20000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'PUSH' && 
-                 msg.value?.stage === 'provider_success' &&
-                 msg.value?.status === 'success'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.channel_name === 'PUSH' &&
+          msg.value?.stage === 'provider_success' &&
+          msg.value?.status === 'success'
       );
       expect(pushSuccessLog).toBeTruthy();
       const pushSuccessValue: DeliveryLog = pushSuccessLog!.value;
@@ -964,8 +974,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const pushProviderResponse = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE,
         20000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'PUSH'
+        (msg) => msg.value?.notification_id === notificationId && msg.value?.channel_name === 'PUSH'
       );
       expect(pushProviderResponse).toBeTruthy();
       const pushProviderValue: ProviderRequestResponse = pushProviderResponse!.value;
@@ -1061,7 +1070,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       expect(messageValue.rendered_templates).toHaveLength(1);
       expect(messageValue.rendered_templates[0].channel_name).toBe('PUSH');
       expect(messageValue.rendered_templates.some((t) => t.channel_name === 'EMAIL')).toBe(false);
-      
+
       // Verify template details for PUSH
       const pushTemplate = messageValue.rendered_templates[0];
       expect(pushTemplate.channel_id).toBeGreaterThan(0);
@@ -1103,9 +1112,10 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const pushDeliveryLog = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.DELIVERY_LOGS,
         15000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'PUSH' && 
-                 msg.value?.stage === 'routed'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.channel_name === 'PUSH' &&
+          msg.value?.stage === 'routed'
       );
       expect(pushDeliveryLog).toBeTruthy();
       const pushLogValue: DeliveryLog = pushDeliveryLog!.value;
@@ -1130,10 +1140,11 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const pushSuccessLog = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.DELIVERY_LOGS,
         20000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'PUSH' && 
-                 msg.value?.stage === 'provider_success' &&
-                 msg.value?.status === 'success'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.channel_name === 'PUSH' &&
+          msg.value?.stage === 'provider_success' &&
+          msg.value?.status === 'success'
       );
       expect(pushSuccessLog).toBeTruthy();
       const pushSuccessValue: DeliveryLog = pushSuccessLog!.value;
@@ -1159,8 +1170,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const pushProviderResponse = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE,
         20000,
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.channel_name === 'PUSH'
+        (msg) => msg.value?.notification_id === notificationId && msg.value?.channel_name === 'PUSH'
       );
       expect(pushProviderResponse).toBeTruthy();
       const pushProviderValue: ProviderRequestResponse = pushProviderResponse!.value;
@@ -1217,10 +1227,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         },
       };
 
-      await request(app.getHttpServer())
-        .post('/notifications/send')
-        .send(payload)
-        .expect(404);
+      await request(app.getHttpServer()).post('/notifications/send').send(payload).expect(404);
     });
 
     it('should return 400 for missing required fields', async () => {
@@ -1232,10 +1239,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         },
       };
 
-      await request(app.getHttpServer())
-        .post('/notifications/send')
-        .send(payload)
-        .expect(400);
+      await request(app.getHttpServer()).post('/notifications/send').send(payload).expect(400);
     });
 
     it('should validate request body structure', async () => {
@@ -1245,10 +1249,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         data: {},
       };
 
-      await request(app.getHttpServer())
-        .post('/notifications/send')
-        .send(payload)
-        .expect(400);
+      await request(app.getHttpServer()).post('/notifications/send').send(payload).expect(400);
     });
   });
 
@@ -1267,10 +1268,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         },
       };
 
-      await request(app.getHttpServer())
-        .post('/notifications/send')
-        .send(payload)
-        .expect(202);
+      await request(app.getHttpServer()).post('/notifications/send').send(payload).expect(202);
 
       const messages = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.NOTIFICATION,
@@ -1301,10 +1299,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         },
       };
 
-      await request(app.getHttpServer())
-        .post('/notifications/send')
-        .send(payload)
-        .expect(202);
+      await request(app.getHttpServer()).post('/notifications/send').send(payload).expect(202);
 
       // Verify message in notification topic
       const notificationMessage = await kafkaHelper.waitForMessage(
@@ -1335,7 +1330,8 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const emailMessage = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.EMAIL_NOTIFICATION,
         15000,
-        (msg) => msg.value?.notification_id === notificationId && msg.value?.channel_name === 'EMAIL'
+        (msg) =>
+          msg.value?.notification_id === notificationId && msg.value?.channel_name === 'EMAIL'
       );
       expect(emailMessage).toBeTruthy();
       expect(emailMessage?.topic).toBe(KAFKA_TOPICS.EMAIL_NOTIFICATION);
@@ -1345,7 +1341,8 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         notification_id: notificationId,
         channel_name: 'EMAIL',
         recipient: 'jane@example.com',
-        template_content: '<h1>New Message</h1><p>Hi Jane Doe,</p><p>You have a new message from John Doe:</p><p>Test routing</p>',
+        template_content:
+          '<h1>New Message</h1><p>Hi Jane Doe,</p><p>You have a new message from John Doe:</p><p>Test routing</p>',
         template_subject: 'New Message from John Doe',
       });
 
@@ -1354,10 +1351,10 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const routingLogs = allDeliveryLogs.filter(
         (msg) => msg.value?.notification_id === notificationId && msg.value?.stage === 'routed'
       );
-      
+
       // Should have 2 delivery logs (one for PUSH, one for EMAIL)
       expect(routingLogs.length).toBeGreaterThanOrEqual(2);
-      
+
       const pushLog = routingLogs.find((msg) => msg.value?.channel_name === 'PUSH');
       expect(pushLog).toBeTruthy();
       expect(pushLog!.value).toMatchObject({
@@ -1379,12 +1376,13 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       // Verify successful delivery logs (provider_success)
       // Note: This requires push and email workers to be running
       await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait for workers to process
-      
+
       const allLogs = kafkaHelper.getMessages(KAFKA_TOPICS.DELIVERY_LOGS);
       const successLogs = allLogs.filter(
-        (msg) => msg.value?.notification_id === notificationId && 
-                 msg.value?.stage === 'provider_success' &&
-                 msg.value?.status === 'success'
+        (msg) =>
+          msg.value?.notification_id === notificationId &&
+          msg.value?.stage === 'provider_success' &&
+          msg.value?.status === 'success'
       );
 
       const pushSuccessLog = successLogs.find((msg) => msg.value?.channel_name === 'PUSH');
@@ -1424,10 +1422,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         },
       };
 
-      await request(app.getHttpServer())
-        .post('/notifications/send')
-        .send(payload)
-        .expect(202);
+      await request(app.getHttpServer()).post('/notifications/send').send(payload).expect(202);
 
       const message = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.NOTIFICATION,
@@ -1452,10 +1447,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
         },
       };
 
-      await request(app.getHttpServer())
-        .post('/notifications/send')
-        .send(payload)
-        .expect(202);
+      await request(app.getHttpServer()).post('/notifications/send').send(payload).expect(202);
 
       const message = await kafkaHelper.waitForMessage(
         KAFKA_TOPICS.NOTIFICATION,
@@ -1466,7 +1458,7 @@ describe('NotificationApi Integration Tests (e2e)', () => {
       const messageValue: NotificationMessage = message?.value;
       expect(messageValue.rendered_templates).toBeDefined();
       expect(Array.isArray(messageValue.rendered_templates)).toBe(true);
-      
+
       messageValue.rendered_templates.forEach((template) => {
         expect(template).toHaveProperty('channel_id');
         expect(template).toHaveProperty('channel_name');
@@ -1478,4 +1470,3 @@ describe('NotificationApi Integration Tests (e2e)', () => {
     });
   });
 });
-

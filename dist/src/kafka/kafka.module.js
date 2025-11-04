@@ -16,7 +16,7 @@ exports.KafkaModule = KafkaModule = __decorate([
     (0, common_1.Global)(),
     (0, common_1.Module)({
         providers: [kafka_service_1.KafkaService],
-        exports: [kafka_service_1.KafkaService]
+        exports: [kafka_service_1.KafkaService],
     })
 ], KafkaModule);
 //# sourceMappingURL=kafka.module.js.map

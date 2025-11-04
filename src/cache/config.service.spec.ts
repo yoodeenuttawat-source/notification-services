@@ -46,11 +46,11 @@ describe('ConfigService', () => {
         name: 'Test Template',
         content: 'Test content',
         variables: {},
-        required_fields: []
+        required_fields: [],
       };
 
       cacheService.set('config:templates', {
-        '1:1': mockTemplate
+        '1:1': mockTemplate,
       });
 
       const result = await service.getTemplate(1, 1);
@@ -61,9 +61,9 @@ describe('ConfigService', () => {
     it('should return null when template not in cache', async () => {
       // Don't set cache, so it will fallback to DB
       cacheService.delete('config:templates');
-      
+
       mockDatabaseService.callProcedure.mockResolvedValue({
-        rows: []
+        rows: [],
       });
 
       const result = await service.getTemplate(1, 1);
@@ -79,11 +79,11 @@ describe('ConfigService', () => {
         name: 'Test Template',
         content: 'Test content',
         variables: {},
-        required_fields: []
+        required_fields: [],
       };
 
       mockDatabaseService.callProcedure.mockResolvedValue({
-        rows: [mockTemplate]
+        rows: [mockTemplate],
       });
 
       const result = await service.getTemplate(1, 1);
@@ -93,17 +93,19 @@ describe('ConfigService', () => {
 
     it('should return null when template not found in database', async () => {
       cacheService.delete('config:templates');
-      
+
       mockDatabaseService.callProcedure.mockResolvedValue({
-        rows: [{
-          template_id: 2,
-          event_id: 1,
-          channel_id: 2,
-          name: 'Other Template',
-          content: 'Other content',
-          variables: {},
-          required_fields: []
-        }]
+        rows: [
+          {
+            template_id: 2,
+            event_id: 1,
+            channel_id: 2,
+            name: 'Other Template',
+            content: 'Other content',
+            variables: {},
+            required_fields: [],
+          },
+        ],
       });
 
       const result = await service.getTemplate(1, 1);
@@ -115,11 +117,11 @@ describe('ConfigService', () => {
     it('should return mappings from cache when available', async () => {
       const mockMappings = [
         { event_id: 1, event_name: 'TEST', channel_id: 1, channel_name: 'EMAIL' },
-        { event_id: 1, event_name: 'TEST', channel_id: 2, channel_name: 'PUSH' }
+        { event_id: 1, event_name: 'TEST', channel_id: 2, channel_name: 'PUSH' },
       ];
 
       cacheService.set('config:event_channel_mappings', {
-        1: mockMappings
+        1: mockMappings,
       });
 
       const result = await service.getEventChannelMappings(1);
@@ -130,12 +132,12 @@ describe('ConfigService', () => {
     it('should return empty array when event not in cache', async () => {
       // Set cache with a different event_id to ensure event 1 is not in cache
       cacheService.set('config:event_channel_mappings', {
-        999: [{ event_id: 999, event_name: 'OTHER', channel_id: 1, channel_name: 'EMAIL' }]
+        999: [{ event_id: 999, event_name: 'OTHER', channel_id: 1, channel_name: 'EMAIL' }],
       });
 
       // Mock DB call to return empty (should fallback to DB)
       mockDatabaseService.callProcedure.mockResolvedValue({
-        rows: []
+        rows: [],
       });
 
       const result = await service.getEventChannelMappings(1);
@@ -146,13 +148,13 @@ describe('ConfigService', () => {
 
     it('should fallback to database when cache miss', async () => {
       const mockMappings = [
-        { event_id: 1, event_name: 'TEST', channel_id: 1, channel_name: 'EMAIL' }
+        { event_id: 1, event_name: 'TEST', channel_id: 1, channel_name: 'EMAIL' },
       ];
 
       cacheService.delete('config:event_channel_mappings');
 
       mockDatabaseService.callProcedure.mockResolvedValue({
-        rows: mockMappings
+        rows: mockMappings,
       });
 
       const result = await service.getEventChannelMappings(1);
@@ -166,8 +168,8 @@ describe('ConfigService', () => {
       mockDatabaseService.callProcedure.mockResolvedValue({
         rows: [
           { event_id: 1, event_name: 'TEST', channel_id: 1, channel_name: 'EMAIL' },
-          { event_id: 2, event_name: 'OTHER', channel_id: 1, channel_name: 'EMAIL' }
-        ]
+          { event_id: 2, event_name: 'OTHER', channel_id: 1, channel_name: 'EMAIL' },
+        ],
       });
 
       const result = await service.getEventChannelMappings(1);
@@ -179,11 +181,11 @@ describe('ConfigService', () => {
   describe('getProvidersByChannel', () => {
     it('should return providers from cache when available', async () => {
       const mockProviders = [
-        { provider_id: 1, name: 'EmailProvider1', channel_id: 1, priority: 1 }
+        { provider_id: 1, name: 'EmailProvider1', channel_id: 1, priority: 1 },
       ];
 
       cacheService.set('config:providers', {
-        1: mockProviders
+        1: mockProviders,
       });
 
       const result = await service.getProvidersByChannel(1);
@@ -194,12 +196,12 @@ describe('ConfigService', () => {
     it('should return empty array when channel not in cache', async () => {
       // Set cache with a different channel_id to ensure channel 1 is not in cache
       cacheService.set('config:providers', {
-        999: [{ provider_id: 2, name: 'PushProvider1', channel_id: 999, priority: 1 }]
+        999: [{ provider_id: 2, name: 'PushProvider1', channel_id: 999, priority: 1 }],
       });
 
       // Mock DB call to return empty (should not be called though)
       mockDatabaseService.callProcedure.mockResolvedValue({
-        rows: []
+        rows: [],
       });
 
       const result = await service.getProvidersByChannel(1);
@@ -210,13 +212,13 @@ describe('ConfigService', () => {
 
     it('should fallback to database when cache miss', async () => {
       const mockProviders = [
-        { provider_id: 1, name: 'EmailProvider1', channel_id: 1, priority: 1 }
+        { provider_id: 1, name: 'EmailProvider1', channel_id: 1, priority: 1 },
       ];
 
       cacheService.delete('config:providers');
 
       mockDatabaseService.callProcedure.mockResolvedValue({
-        rows: mockProviders
+        rows: mockProviders,
       });
 
       const result = await service.getProvidersByChannel(1);
@@ -230,8 +232,8 @@ describe('ConfigService', () => {
       mockDatabaseService.callProcedure.mockResolvedValue({
         rows: [
           { provider_id: 1, name: 'EmailProvider1', channel_id: 1, priority: 1 },
-          { provider_id: 2, name: 'PushProvider1', channel_id: 2, priority: 1 }
-        ]
+          { provider_id: 2, name: 'PushProvider1', channel_id: 2, priority: 1 },
+        ],
       });
 
       const result = await service.getProvidersByChannel(1);
@@ -244,7 +246,7 @@ describe('ConfigService', () => {
     it('should return event info from cache when available', async () => {
       cacheService.set('config:events', {
         1: 'CHAT_MESSAGE',
-        2: 'PURCHASE'
+        2: 'PURCHASE',
       });
 
       const result = await service.getEventInfoByName('CHAT_MESSAGE');
@@ -256,7 +258,7 @@ describe('ConfigService', () => {
       cacheService.set('config:events', {});
 
       mockDatabaseService.callProcedure.mockResolvedValue({
-        rows: []
+        rows: [],
       });
 
       const result = await service.getEventInfoByName('UNKNOWN');
@@ -270,7 +272,7 @@ describe('ConfigService', () => {
       cacheService.delete('config:events');
 
       mockDatabaseService.callProcedure.mockResolvedValue({
-        rows: [mockEvent]
+        rows: [mockEvent],
       });
 
       const result = await service.getEventInfoByName('CHAT_MESSAGE');
@@ -282,7 +284,7 @@ describe('ConfigService', () => {
       cacheService.delete('config:events');
 
       mockDatabaseService.callProcedure.mockResolvedValue({
-        rows: [{ event_id: 1, name: 'OTHER_EVENT' }]
+        rows: [{ event_id: 1, name: 'OTHER_EVENT' }],
       });
 
       const result = await service.getEventInfoByName('UNKNOWN');
@@ -296,36 +298,36 @@ describe('ConfigService', () => {
         if (procedureName === 'get_all_templates') {
           return Promise.resolve({
             rows: [
-              { template_id: 1, event_id: 1, channel_id: 1, name: 'Template', content: 'Content', variables: {}, required_fields: [] }
-            ]
+              {
+                template_id: 1,
+                event_id: 1,
+                channel_id: 1,
+                name: 'Template',
+                content: 'Content',
+                variables: {},
+                required_fields: [],
+              },
+            ],
           });
         }
         if (procedureName === 'get_all_event_channel_mappings') {
           return Promise.resolve({
-            rows: [
-              { event_id: 1, event_name: 'TEST', channel_id: 1, channel_name: 'EMAIL' }
-            ]
+            rows: [{ event_id: 1, event_name: 'TEST', channel_id: 1, channel_name: 'EMAIL' }],
           });
         }
         if (procedureName === 'get_all_providers') {
           return Promise.resolve({
-            rows: [
-              { provider_id: 1, name: 'EmailProvider1', channel_id: 1, priority: 1 }
-            ]
+            rows: [{ provider_id: 1, name: 'EmailProvider1', channel_id: 1, priority: 1 }],
           });
         }
         if (procedureName === 'get_all_events') {
           return Promise.resolve({
-            rows: [
-              { event_id: 1, name: 'CHAT_MESSAGE' }
-            ]
+            rows: [{ event_id: 1, name: 'CHAT_MESSAGE' }],
           });
         }
         if (procedureName === 'get_all_channels') {
           return Promise.resolve({
-            rows: [
-              { channel_id: 1, channel: 'EMAIL' }
-            ]
+            rows: [{ channel_id: 1, channel: 'EMAIL' }],
           });
         }
         return Promise.resolve({ rows: [] });
@@ -352,9 +354,25 @@ describe('ConfigService', () => {
         if (procedureName === 'get_all_templates') {
           return Promise.resolve({
             rows: [
-              { template_id: 1, event_id: 1, channel_id: 1, name: 'Template1', content: 'Content1', variables: {}, required_fields: [] },
-              { template_id: 2, event_id: 1, channel_id: 2, name: 'Template2', content: 'Content2', variables: {}, required_fields: [] }
-            ]
+              {
+                template_id: 1,
+                event_id: 1,
+                channel_id: 1,
+                name: 'Template1',
+                content: 'Content1',
+                variables: {},
+                required_fields: [],
+              },
+              {
+                template_id: 2,
+                event_id: 1,
+                channel_id: 2,
+                name: 'Template2',
+                content: 'Content2',
+                variables: {},
+                required_fields: [],
+              },
+            ],
           });
         }
         return Promise.resolve({ rows: [] });
@@ -406,10 +424,10 @@ describe('ConfigService', () => {
       }).compile();
 
       const newService = module.get<ConfigService>(ConfigService);
-      
+
       // This should succeed and log success message
       await newService.onModuleInit();
-      
+
       expect(mockDatabaseService.callProcedure).toHaveBeenCalled();
     });
 

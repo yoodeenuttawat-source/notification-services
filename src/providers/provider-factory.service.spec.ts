@@ -79,8 +79,8 @@ describe('ProviderFactoryService', () => {
     it('should return all providers', () => {
       const providers = service.getAllProviders();
       expect(providers.length).toBe(4);
-      
-      const providerNames = providers.map(p => p.getName());
+
+      const providerNames = providers.map((p) => p.getName());
       expect(providerNames).toContain('PushProvider1');
       expect(providerNames).toContain('PushProvider2');
       expect(providerNames).toContain('EmailProvider1');
@@ -89,10 +89,9 @@ describe('ProviderFactoryService', () => {
 
     it('should return instances of BaseProviderService', () => {
       const providers = service.getAllProviders();
-      providers.forEach(provider => {
+      providers.forEach((provider) => {
         expect(provider).toBeInstanceOf(BaseProviderService);
       });
     });
   });
 });
-

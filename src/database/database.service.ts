@@ -40,7 +40,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     const result = await this.pool.query(text, params);
     return {
       rows: result.rows,
-      rowCount: result.rowCount || 0
+      rowCount: result.rowCount || 0,
     };
   }
 
@@ -74,7 +74,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     const result = await this.pool.query(query, params);
     return {
       rows: result.rows,
-      rowCount: result.rowCount || 0
+      rowCount: result.rowCount || 0,
     };
   }
 

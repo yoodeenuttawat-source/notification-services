@@ -5,12 +5,12 @@ import { NotificationApiModule } from './notification-api.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(NotificationApiModule);
-  
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
-      transform: true
+      transform: true,
     })
   );
 

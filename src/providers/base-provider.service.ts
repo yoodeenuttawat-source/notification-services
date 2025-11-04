@@ -3,7 +3,7 @@ import { CircuitBreakerConfig } from '../circuit-breaker/CircuitBreakerStrategy'
 import { CircuitBreakerOpenError } from '../circuit-breaker/CircuitBreakerOpenError';
 import { KafkaService } from '../kafka/kafka.service';
 import { KAFKA_TOPICS } from '../kafka/kafka.config';
-import { ProviderRequestResponse } from '../kafka/types/provider-response';
+import { ProviderRequestResponse } from '../kafka/types/provider-request-response';
 import { DeliveryLog } from '../kafka/types/delivery-log';
 
 export interface NotificationContext {
@@ -44,7 +44,9 @@ export abstract class BaseProviderService {
    */
   async sendNotification(payload: NotificationPayload): Promise<NotificationResult> {
     // Check circuit breaker using strategy pattern
-    if (!this.circuitBreakerService.shouldAllowRequest(this.providerName, this.circuitBreakerConfig)) {
+    if (
+      !this.circuitBreakerService.shouldAllowRequest(this.providerName, this.circuitBreakerConfig)
+    ) {
       throw new CircuitBreakerOpenError(
         `Circuit breaker is OPEN for ${this.providerName}. Request rejected.`
       );
@@ -60,10 +62,10 @@ export abstract class BaseProviderService {
       // Call the actual provider implementation
       const result = await this.executeSend(payload);
       const responseTimestamp = new Date().toISOString();
-      
+
       // Record success
       this.circuitBreakerService.recordSuccess(this.providerName, this.circuitBreakerConfig);
-      
+
       // Publish provider request/response if KafkaService is available and context is provided
       if (this.kafkaService && payload.context) {
         await this.publishProviderResponse({
@@ -78,10 +80,10 @@ export abstract class BaseProviderService {
           request_header: headers,
           response: JSON.stringify({
             success: true,
-            messageId: result.messageId
+            messageId: result.messageId,
           }),
           request_timestamp: requestTimestamp,
-          response_timestamp: responseTimestamp
+          response_timestamp: responseTimestamp,
         });
 
         // Publish delivery log for successful notification (without provider_name)
@@ -94,22 +96,22 @@ export abstract class BaseProviderService {
           stage: 'provider_success',
           status: 'success',
           message_id: result.messageId,
-          provider_request_id: providerRequestId
+          provider_request_id: providerRequestId,
         });
       }
-      
+
       return {
         ...result,
         providerName: this.providerName,
-        provider_request_id: providerRequestId
+        provider_request_id: providerRequestId,
       };
     } catch (error) {
       const responseTimestamp = new Date().toISOString();
       const errorObj = error instanceof Error ? error : new Error(String(error));
-      
+
       // Record failure
       this.circuitBreakerService.recordFailure(this.providerName, this.circuitBreakerConfig);
-      
+
       // Publish provider request/response with error if KafkaService is available and context is provided
       if (this.kafkaService && payload.context) {
         await this.publishProviderResponse({
@@ -127,14 +129,14 @@ export abstract class BaseProviderService {
             error: {
               message: errorObj.message,
               stack: errorObj.stack,
-              type: errorObj.constructor.name
-            }
+              type: errorObj.constructor.name,
+            },
           }),
           request_timestamp: requestTimestamp,
-          response_timestamp: responseTimestamp
+          response_timestamp: responseTimestamp,
         });
       }
-      
+
       throw error;
     }
   }
@@ -142,21 +144,23 @@ export abstract class BaseProviderService {
   /**
    * Publish provider request/response to Kafka
    */
-  private async publishProviderResponse(response: Omit<ProviderRequestResponse, 'timestamp'>): Promise<void> {
+  private async publishProviderResponse(
+    response: Omit<ProviderRequestResponse, 'timestamp'>
+  ): Promise<void> {
     if (!this.kafkaService) {
       return; // Skip if KafkaService is not available
     }
 
     const providerResponse: ProviderRequestResponse = {
       ...response,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     await this.kafkaService.publishMessage(KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE, [
       {
         key: response.provider_request_id,
-        value: providerResponse
-      }
+        value: providerResponse,
+      },
     ]);
   }
 
@@ -170,21 +174,23 @@ export abstract class BaseProviderService {
 
     const deliveryLog: DeliveryLog = {
       ...log,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     await this.kafkaService.publishMessage(KAFKA_TOPICS.DELIVERY_LOGS, [
       {
         key: log.notification_id,
-        value: deliveryLog
-      }
+        value: deliveryLog,
+      },
     ]);
   }
 
   /**
    * Abstract method to be implemented by concrete providers
    */
-  protected abstract executeSend(payload: NotificationPayload): Promise<Omit<NotificationResult, 'providerName'>>;
+  protected abstract executeSend(
+    payload: NotificationPayload
+  ): Promise<Omit<NotificationResult, 'providerName'>>;
 
   /**
    * Get the request payload to send to provider API
@@ -225,4 +231,3 @@ export abstract class BaseProviderService {
     return this.channelType;
   }
 }
-

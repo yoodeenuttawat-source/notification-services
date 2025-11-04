@@ -24,7 +24,12 @@ export abstract class ChannelWorkerBaseService extends BaseWorkerService {
   /**
    * Get providers for a channel
    */
-  protected async getProviders(channelId: number): Promise<Array<{ name: string; priority: number; provider_id: number; channel_id: number }> | null> {
+  protected async getProviders(channelId: number): Promise<Array<{
+    name: string;
+    priority: number;
+    provider_id: number;
+    channel_id: number;
+  }> | null> {
     try {
       return await this.configService.getProvidersByChannel(channelId);
     } catch (error) {
@@ -90,7 +95,7 @@ export abstract class ChannelWorkerBaseService extends BaseWorkerService {
             event_name: message.event_name,
             channel_id: message.channel_id,
             channel_name: message.channel_name,
-          }
+          },
         });
 
         this.logger.log(
@@ -145,4 +150,3 @@ export abstract class ChannelWorkerBaseService extends BaseWorkerService {
    */
   protected abstract getChannelTopic(): string;
 }
-

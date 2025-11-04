@@ -13,7 +13,7 @@ export class NotificationApiController {
     return {
       status: 'ok',
       service: 'notification-api',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -21,11 +21,11 @@ export class NotificationApiController {
   @HttpCode(HttpStatus.ACCEPTED)
   async sendNotification(@Body() dto: SendNotificationDto): Promise<NotificationResponseDto> {
     await this.notificationApiService.sendNotification(dto);
-    
+
     return {
       success: true,
       notification_id: dto.notification_id,
-      message: 'Notification accepted and queued for processing'
+      message: 'Notification accepted and queued for processing',
     };
   }
 }

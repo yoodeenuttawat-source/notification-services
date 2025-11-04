@@ -36,7 +36,7 @@ export class ConfigService implements OnModuleInit {
     EVENT_CHANNEL_MAPPINGS: 'config:event_channel_mappings',
     PROVIDERS: 'config:providers',
     EVENTS: 'config:events',
-    CHANNELS: 'config:channels'
+    CHANNELS: 'config:channels',
   };
 
   constructor(
@@ -66,7 +66,6 @@ export class ConfigService implements OnModuleInit {
     }
   }
 
-
   async refreshCache() {
     this.logger.log('Refreshing configuration cache...');
     try {
@@ -75,7 +74,7 @@ export class ConfigService implements OnModuleInit {
         this.cacheEventChannelMappings(),
         this.cacheProviders(),
         this.cacheEvents(),
-        this.cacheChannels()
+        this.cacheChannels(),
       ]);
       this.logger.log('Configuration cache refreshed successfully');
     } catch (error) {
@@ -85,9 +84,7 @@ export class ConfigService implements OnModuleInit {
   }
 
   private async cacheTemplates() {
-    const result = await this.databaseService.callProcedure<TemplateCache>(
-      'get_all_templates'
-    );
+    const result = await this.databaseService.callProcedure<TemplateCache>('get_all_templates');
 
     const templatesByEventChannel = new Map<string, TemplateCache>();
     for (const template of result.rows) {
@@ -120,9 +117,7 @@ export class ConfigService implements OnModuleInit {
   }
 
   private async cacheProviders() {
-    const result = await this.databaseService.callProcedure<ProviderCache>(
-      'get_all_providers'
-    );
+    const result = await this.databaseService.callProcedure<ProviderCache>('get_all_providers');
 
     const providersByChannel = new Map<number, ProviderCache[]>();
     for (const provider of result.rows) {
@@ -132,10 +127,7 @@ export class ConfigService implements OnModuleInit {
       providersByChannel.get(provider.channel_id)!.push(provider);
     }
 
-    this.cacheService.set(
-      this.CACHE_KEYS.PROVIDERS,
-      Object.fromEntries(providersByChannel)
-    );
+    this.cacheService.set(this.CACHE_KEYS.PROVIDERS, Object.fromEntries(providersByChannel));
     this.logger.log(`Cached ${providersByChannel.size} providers`);
   }
 
@@ -154,9 +146,10 @@ export class ConfigService implements OnModuleInit {
   }
 
   private async cacheChannels() {
-    const result = await this.databaseService.callProcedure<{ channel_id: number; channel: string }>(
-      'get_all_channels'
-    );
+    const result = await this.databaseService.callProcedure<{
+      channel_id: number;
+      channel: string;
+    }>('get_all_channels');
 
     const channelsMap = new Map<number, string>();
     for (const channel of result.rows) {
@@ -175,13 +168,9 @@ export class ConfigService implements OnModuleInit {
     }
 
     // Fallback to DB using get_all_templates and filter
-    const result = await this.databaseService.callProcedure<TemplateCache>(
-      'get_all_templates'
-    );
+    const result = await this.databaseService.callProcedure<TemplateCache>('get_all_templates');
 
-    const template = result.rows.find(
-      t => t.event_id === eventId && t.channel_id === channelId
-    );
+    const template = result.rows.find((t) => t.event_id === eventId && t.channel_id === channelId);
     return template || null;
   }
 
@@ -198,24 +187,26 @@ export class ConfigService implements OnModuleInit {
       'get_all_event_channel_mappings'
     );
 
-    return result.rows.filter(m => m.event_id === eventId);
+    return result.rows.filter((m) => m.event_id === eventId);
   }
 
   async getProvidersByChannel(channelId: number): Promise<ProviderCache[]> {
-    const cached = this.cacheService.get<Record<number, ProviderCache[]>>(this.CACHE_KEYS.PROVIDERS);
+    const cached = this.cacheService.get<Record<number, ProviderCache[]>>(
+      this.CACHE_KEYS.PROVIDERS
+    );
     if (cached && cached[channelId]) {
       return cached[channelId];
     }
 
     // Fallback to DB using get_all_providers and filter
-    const result = await this.databaseService.callProcedure<ProviderCache>(
-      'get_all_providers'
-    );
+    const result = await this.databaseService.callProcedure<ProviderCache>('get_all_providers');
 
-    return result.rows.filter(p => p.channel_id === channelId);
+    return result.rows.filter((p) => p.channel_id === channelId);
   }
 
-  async getEventInfoByName(eventName: string): Promise<{ eventId: number; eventName: string } | null> {
+  async getEventInfoByName(
+    eventName: string
+  ): Promise<{ eventId: number; eventName: string } | null> {
     const cached = this.cacheService.get<Record<number, string>>(this.CACHE_KEYS.EVENTS);
     if (cached) {
       // Find event_id by searching through cached events
@@ -231,7 +222,7 @@ export class ConfigService implements OnModuleInit {
       'get_all_events'
     );
 
-    const event = result.rows.find(e => e.name === eventName);
+    const event = result.rows.find((e) => e.name === eventName);
     if (event) {
       return { eventId: event.event_id, eventName: event.name };
     }

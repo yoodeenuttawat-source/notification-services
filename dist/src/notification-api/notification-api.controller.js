@@ -24,7 +24,7 @@ let NotificationApiController = class NotificationApiController {
         return {
             status: 'ok',
             service: 'notification-api',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         };
     }
     async sendNotification(dto) {
@@ -32,7 +32,7 @@ let NotificationApiController = class NotificationApiController {
         return {
             success: true,
             notification_id: dto.notification_id,
-            message: 'Notification accepted and queued for processing'
+            message: 'Notification accepted and queued for processing',
         };
     }
 };

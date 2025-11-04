@@ -16,10 +16,22 @@ export class ProviderFactoryService {
     private readonly kafkaService?: KafkaService
   ) {
     // Initialize all providers with KafkaService
-    this.providers.set('PushProvider1', new PushProviderService1(this.circuitBreakerService, this.kafkaService));
-    this.providers.set('PushProvider2', new PushProviderService2(this.circuitBreakerService, this.kafkaService));
-    this.providers.set('EmailProvider1', new EmailProviderService1(this.circuitBreakerService, this.kafkaService));
-    this.providers.set('EmailProvider2', new EmailProviderService2(this.circuitBreakerService, this.kafkaService));
+    this.providers.set(
+      'PushProvider1',
+      new PushProviderService1(this.circuitBreakerService, this.kafkaService)
+    );
+    this.providers.set(
+      'PushProvider2',
+      new PushProviderService2(this.circuitBreakerService, this.kafkaService)
+    );
+    this.providers.set(
+      'EmailProvider1',
+      new EmailProviderService1(this.circuitBreakerService, this.kafkaService)
+    );
+    this.providers.set(
+      'EmailProvider2',
+      new EmailProviderService2(this.circuitBreakerService, this.kafkaService)
+    );
   }
 
   getProvider(name: string): BaseProviderService | undefined {

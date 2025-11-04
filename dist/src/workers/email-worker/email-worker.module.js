@@ -18,7 +18,7 @@ exports.EmailWorkerModule = EmailWorkerModule;
 exports.EmailWorkerModule = EmailWorkerModule = __decorate([
     (0, common_1.Module)({
         imports: [kafka_module_1.KafkaModule, cache_module_1.CacheModule, providers_module_1.ProvidersModule],
-        providers: [email_worker_service_1.EmailWorkerService]
+        providers: [email_worker_service_1.EmailWorkerService],
     })
 ], EmailWorkerModule);
 //# sourceMappingURL=email-worker.module.js.map

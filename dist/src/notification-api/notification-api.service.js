@@ -61,7 +61,7 @@ let NotificationApiService = NotificationApiService_1 = class NotificationApiSer
                 template_name: template.name,
                 subject: renderedSubject,
                 content: renderedContent,
-                recipient
+                recipient,
             });
         }
         if (renderedTemplates.length === 0) {
@@ -75,14 +75,14 @@ let NotificationApiService = NotificationApiService_1 = class NotificationApiSer
             data: dto.data,
             metadata: {
                 ...dto.metadata,
-                timestamp: new Date().toISOString()
-            }
+                timestamp: new Date().toISOString(),
+            },
         };
         await this.kafkaService.publishMessage(kafka_config_1.KAFKA_TOPICS.NOTIFICATION, [
             {
                 key: dto.notification_id,
-                value: message
-            }
+                value: message,
+            },
         ]);
         this.logger.log(`Notification published: ${dto.notification_id}, event: ${eventName}, templates: ${renderedTemplates.length}`);
     }

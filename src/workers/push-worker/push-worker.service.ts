@@ -37,12 +37,13 @@ export class PushWorkerService extends ChannelWorkerBaseService implements OnMod
 
   async onModuleInit() {
     this.logger.log('Initializing push worker...');
-    
-    this.logger.log(`Creating consumer for group: push-worker-group, topics: ${KAFKA_TOPICS.PUSH_NOTIFICATION}`);
-    const consumer = await this.kafkaService.createConsumer(
-      'push-worker-group',
-      [KAFKA_TOPICS.PUSH_NOTIFICATION]
+
+    this.logger.log(
+      `Creating consumer for group: push-worker-group, topics: ${KAFKA_TOPICS.PUSH_NOTIFICATION}`
     );
+    const consumer = await this.kafkaService.createConsumer('push-worker-group', [
+      KAFKA_TOPICS.PUSH_NOTIFICATION,
+    ]);
 
     this.logger.log('Starting to consume messages from push notification topic...');
     await this.kafkaService.consumeMessages(consumer, async (payload) => {
@@ -54,7 +55,7 @@ export class PushWorkerService extends ChannelWorkerBaseService implements OnMod
 
   private async processPushNotification(payload: EachMessagePayload) {
     const originalMessage = payload.message.value.toString();
-    
+
     try {
       // Parse and validate message
       const message = await this.parseMessage<ChannelMessage>(originalMessage);
@@ -62,7 +63,9 @@ export class PushWorkerService extends ChannelWorkerBaseService implements OnMod
 
       // Check for duplicate message
       if (this.isDuplicate(message.notification_id)) {
-        this.logger.warn(`Duplicate push notification detected, skipping: ${message.notification_id}`);
+        this.logger.warn(
+          `Duplicate push notification detected, skipping: ${message.notification_id}`
+        );
         return; // Skip processing duplicate message
       }
 
@@ -78,7 +81,7 @@ export class PushWorkerService extends ChannelWorkerBaseService implements OnMod
 
       // Try to send notification via providers
       const result = await this.trySendNotification(message, providers, 'Push');
-      
+
       // Handle failure if all providers failed
       if (!result.success) {
         await this.handleAllProvidersFailed(
@@ -98,5 +101,4 @@ export class PushWorkerService extends ChannelWorkerBaseService implements OnMod
       );
     }
   }
-
 }

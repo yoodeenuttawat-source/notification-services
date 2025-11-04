@@ -54,16 +54,20 @@ export class ErrorClassifier {
     ];
 
     // Check for non-retriable first (higher priority)
-    if (nonRetriablePatterns.some(pattern => 
-      errorMessage.includes(pattern) || errorName.includes(pattern)
-    )) {
+    if (
+      nonRetriablePatterns.some(
+        (pattern) => errorMessage.includes(pattern) || errorName.includes(pattern)
+      )
+    ) {
       return false;
     }
 
     // Check for retriable patterns
-    if (retriablePatterns.some(pattern => 
-      errorMessage.includes(pattern) || errorName.includes(pattern)
-    )) {
+    if (
+      retriablePatterns.some(
+        (pattern) => errorMessage.includes(pattern) || errorName.includes(pattern)
+      )
+    ) {
       return true;
     }
 
@@ -79,11 +83,13 @@ export class ErrorClassifier {
     if (!(error instanceof Error)) {
       return false;
     }
-    return error instanceof SyntaxError || 
-           error.name === 'SyntaxError' ||
-           error.message.toLowerCase().includes('json') ||
-           error.message.toLowerCase().includes('parse') ||
-           error.message.toLowerCase().includes('unexpected token');
+    return (
+      error instanceof SyntaxError ||
+      error.name === 'SyntaxError' ||
+      error.message.toLowerCase().includes('json') ||
+      error.message.toLowerCase().includes('parse') ||
+      error.message.toLowerCase().includes('unexpected token')
+    );
   }
 
   /**
@@ -94,11 +100,12 @@ export class ErrorClassifier {
       return false;
     }
     const msg = error.message.toLowerCase();
-    return msg.includes('no providers') ||
-           msg.includes('missing') ||
-           msg.includes('required') ||
-           msg.includes('not found') ||
-           msg.includes('unknown channel');
+    return (
+      msg.includes('no providers') ||
+      msg.includes('missing') ||
+      msg.includes('required') ||
+      msg.includes('not found') ||
+      msg.includes('unknown channel')
+    );
   }
 }
-

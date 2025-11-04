@@ -30,18 +30,19 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
 
   protected getDLQMetadata(notificationId?: string): Record<string, any> {
     return {
-      notification_id: notificationId
+      notification_id: notificationId,
     };
   }
 
   async onModuleInit() {
     this.logger.log('Initializing splitter worker...');
-    
-    this.logger.log(`Creating consumer for group: splitter-worker-group, topics: ${KAFKA_TOPICS.NOTIFICATION}`);
-    const consumer = await this.kafkaService.createConsumer(
-      'splitter-worker-group',
-      [KAFKA_TOPICS.NOTIFICATION]
+
+    this.logger.log(
+      `Creating consumer for group: splitter-worker-group, topics: ${KAFKA_TOPICS.NOTIFICATION}`
     );
+    const consumer = await this.kafkaService.createConsumer('splitter-worker-group', [
+      KAFKA_TOPICS.NOTIFICATION,
+    ]);
 
     this.logger.log('Starting to consume messages from notification topic...');
     await this.kafkaService.consumeMessages(consumer, async (payload) => {
@@ -53,7 +54,7 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
 
   private async processNotification(payload: EachMessagePayload) {
     const originalMessage = payload.message.value.toString();
-    
+
     try {
       // Parse and validate message
       const message = await this.parseMessage<NotificationMessage>(originalMessage);
@@ -69,7 +70,7 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
       this.markAsProcessed(message.notification_id);
 
       // Validate message has templates
-      if (!await this.validateMessage(message)) return;
+      if (!(await this.validateMessage(message))) return;
 
       // Route each rendered template to its channel topic concurrently
       await this.routeTemplates(message);
@@ -82,7 +83,6 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
       );
     }
   }
-
 
   private async validateMessage(message: NotificationMessage): Promise<boolean> {
     if (!message.rendered_templates || message.rendered_templates.length === 0) {
@@ -108,14 +108,14 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
 
     try {
       await Promise.all(
-        message.rendered_templates.map(renderedTemplate =>
+        message.rendered_templates.map((renderedTemplate) =>
           this.routeToChannel(message, renderedTemplate)
         )
       );
     } catch (routeError) {
       const errorObj = routeError instanceof Error ? routeError : new Error(String(routeError));
       this.logger.error('Error routing templates:', errorObj);
-      
+
       await this.publishDeliveryLog({
         notification_id: message.notification_id,
         event_id: message.event_id,
@@ -126,7 +126,7 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
         status: 'failed',
         error_message: errorObj.message,
       });
-      
+
       // Always send to DLQ on routing errors (they are retriable)
       await this.sendToDLQ(
         JSON.stringify(message),
@@ -140,7 +140,7 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
 
   private async routeToChannel(
     notification: NotificationMessage,
-    renderedTemplate: typeof notification.rendered_templates[0]
+    renderedTemplate: (typeof notification.rendered_templates)[0]
   ): Promise<void> {
     try {
       // Create channel message from pre-rendered template
@@ -151,8 +151,8 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
       await this.kafkaService.publishMessage(topic, [
         {
           key: notification.notification_id,
-          value: channelMessage
-        }
+          value: channelMessage,
+        },
       ]);
 
       // Publish delivery log
@@ -172,7 +172,7 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
     } catch (error) {
       const errorObj = error instanceof Error ? error : new Error(String(error));
       this.logger.error(`Error routing to channel ${renderedTemplate.channel_name}:`, errorObj);
-      
+
       // Publish failure log
       await this.publishDeliveryLog({
         notification_id: notification.notification_id,
@@ -184,14 +184,14 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
         status: 'failed',
         error_message: errorObj.message,
       });
-      
+
       throw errorObj; // Re-throw to be caught by routeTemplates
     }
   }
 
   private createChannelMessage(
     notification: NotificationMessage,
-    renderedTemplate: typeof notification.rendered_templates[0]
+    renderedTemplate: (typeof notification.rendered_templates)[0]
   ): ChannelMessage {
     return {
       notification_id: notification.notification_id,
@@ -205,10 +205,9 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
       template_content: renderedTemplate.content,
       recipient: renderedTemplate.recipient,
       variables: notification.data,
-      metadata: notification.metadata
+      metadata: notification.metadata,
     };
   }
-
 
   private getChannelTopic(channelName: string): string {
     switch (channelName.toLowerCase()) {
@@ -220,6 +219,4 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
         throw new Error(`Unknown channel: ${channelName}`);
     }
   }
-
 }
-

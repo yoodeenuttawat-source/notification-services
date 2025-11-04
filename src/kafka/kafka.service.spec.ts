@@ -62,9 +62,9 @@ describe('KafkaService', () => {
     it('should disconnect producer and consumers', async () => {
       // Create a consumer first
       await service.createConsumer('test-group', ['test-topic']);
-      
+
       await service.onModuleDestroy();
-      
+
       expect(mockConsumer.disconnect).toHaveBeenCalled();
       expect(mockProducer.disconnect).toHaveBeenCalled();
     });
@@ -135,7 +135,9 @@ describe('KafkaService', () => {
 
       const messages = [{ value: { test: 'data' } }];
 
-      await expect(service.publishMessage('test-topic', messages)).rejects.toThrow('Publish failed');
+      await expect(service.publishMessage('test-topic', messages)).rejects.toThrow(
+        'Publish failed'
+      );
     });
   });
 
@@ -188,7 +190,7 @@ describe('KafkaService', () => {
       await service.consumeMessages(mockConsumer, handler);
 
       const runCall = mockConsumer.run.mock.calls[0][0];
-      
+
       // Execute the handler to test error handling
       await runCall.eachMessage(mockPayload);
 
@@ -203,4 +205,3 @@ describe('KafkaService', () => {
     });
   });
 });
-

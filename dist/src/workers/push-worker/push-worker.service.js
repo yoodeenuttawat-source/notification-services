@@ -41,7 +41,9 @@ let PushWorkerService = PushWorkerService_1 = class PushWorkerService extends ch
     async onModuleInit() {
         this.logger.log('Initializing push worker...');
         this.logger.log(`Creating consumer for group: push-worker-group, topics: ${kafka_config_1.KAFKA_TOPICS.PUSH_NOTIFICATION}`);
-        const consumer = await this.kafkaService.createConsumer('push-worker-group', [kafka_config_1.KAFKA_TOPICS.PUSH_NOTIFICATION]);
+        const consumer = await this.kafkaService.createConsumer('push-worker-group', [
+            kafka_config_1.KAFKA_TOPICS.PUSH_NOTIFICATION,
+        ]);
         this.logger.log('Starting to consume messages from push notification topic...');
         await this.kafkaService.consumeMessages(consumer, async (payload) => {
             await this.processPushNotification(payload);

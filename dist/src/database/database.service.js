@@ -38,7 +38,7 @@ let DatabaseService = class DatabaseService {
         const result = await this.pool.query(text, params);
         return {
             rows: result.rows,
-            rowCount: result.rowCount || 0
+            rowCount: result.rowCount || 0,
         };
     }
     async transaction(callback) {
@@ -63,7 +63,7 @@ let DatabaseService = class DatabaseService {
         const result = await this.pool.query(query, params);
         return {
             rows: result.rows,
-            rowCount: result.rowCount || 0
+            rowCount: result.rowCount || 0,
         };
     }
     getPool() {

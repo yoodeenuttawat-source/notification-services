@@ -20,7 +20,7 @@ exports.NotificationApiModule = NotificationApiModule = __decorate([
     (0, common_1.Module)({
         imports: [kafka_module_1.KafkaModule, cache_module_1.CacheModule, database_module_1.DatabaseModule],
         controllers: [notification_api_controller_1.NotificationApiController],
-        providers: [notification_api_service_1.NotificationApiService]
+        providers: [notification_api_service_1.NotificationApiService],
     })
 ], NotificationApiModule);
 //# sourceMappingURL=notification-api.module.js.map

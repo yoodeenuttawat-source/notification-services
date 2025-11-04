@@ -25,7 +25,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             EVENT_CHANNEL_MAPPINGS: 'config:event_channel_mappings',
             PROVIDERS: 'config:providers',
             EVENTS: 'config:events',
-            CHANNELS: 'config:channels'
+            CHANNELS: 'config:channels',
         };
     }
     async onModuleInit() {
@@ -54,7 +54,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
                 this.cacheEventChannelMappings(),
                 this.cacheProviders(),
                 this.cacheEvents(),
-                this.cacheChannels()
+                this.cacheChannels(),
             ]);
             this.logger.log('Configuration cache refreshed successfully');
         }
@@ -122,7 +122,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             return cached[key] || null;
         }
         const result = await this.databaseService.callProcedure('get_all_templates');
-        const template = result.rows.find(t => t.event_id === eventId && t.channel_id === channelId);
+        const template = result.rows.find((t) => t.event_id === eventId && t.channel_id === channelId);
         return template || null;
     }
     async getEventChannelMappings(eventId) {
@@ -131,7 +131,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             return cached[eventId];
         }
         const result = await this.databaseService.callProcedure('get_all_event_channel_mappings');
-        return result.rows.filter(m => m.event_id === eventId);
+        return result.rows.filter((m) => m.event_id === eventId);
     }
     async getProvidersByChannel(channelId) {
         const cached = this.cacheService.get(this.CACHE_KEYS.PROVIDERS);
@@ -139,7 +139,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             return cached[channelId];
         }
         const result = await this.databaseService.callProcedure('get_all_providers');
-        return result.rows.filter(p => p.channel_id === channelId);
+        return result.rows.filter((p) => p.channel_id === channelId);
     }
     async getEventInfoByName(eventName) {
         const cached = this.cacheService.get(this.CACHE_KEYS.EVENTS);
@@ -151,7 +151,7 @@ let ConfigService = ConfigService_1 = class ConfigService {
             }
         }
         const result = await this.databaseService.callProcedure('get_all_events');
-        const event = result.rows.find(e => e.name === eventName);
+        const event = result.rows.find((e) => e.name === eventName);
         if (event) {
             return { eventId: event.event_id, eventName: event.name };
         }

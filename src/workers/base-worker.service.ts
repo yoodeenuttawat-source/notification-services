@@ -40,7 +40,7 @@ export abstract class BaseWorkerService {
   protected getDLQMetadata(notificationId?: string): Record<string, any> {
     return {
       notification_id: notificationId,
-      channel_name: this.getDefaultChannelName()
+      channel_name: this.getDefaultChannelName(),
     };
   }
 
@@ -53,7 +53,7 @@ export abstract class BaseWorkerService {
     } catch (parseError) {
       const parseErr = parseError instanceof Error ? parseError : new Error(String(parseError));
       this.logger.error('JSON parse error (non-retriable):', parseErr);
-      
+
       await this.publishDeliveryLog({
         notification_id: 'unknown',
         event_id: 0,
@@ -74,14 +74,14 @@ export abstract class BaseWorkerService {
   protected async publishDeliveryLog(log: Omit<DeliveryLog, 'timestamp'>): Promise<void> {
     const deliveryLog: DeliveryLog = {
       ...log,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     await this.kafkaService.publishMessage(KAFKA_TOPICS.DELIVERY_LOGS, [
       {
         key: log.notification_id,
-        value: deliveryLog
-      }
+        value: deliveryLog,
+      },
     ]);
   }
 
@@ -97,7 +97,7 @@ export abstract class BaseWorkerService {
   ): Promise<void> {
     try {
       const errorObj = error instanceof Error ? error : new Error(String(error));
-      
+
       const dlqMessage: DLQMessage = {
         originalMessage: JSON.parse(originalMessage),
         originalTopic,
@@ -105,20 +105,20 @@ export abstract class BaseWorkerService {
         error: {
           message: errorObj.message,
           stack: errorObj.stack,
-          type: errorObj.constructor.name
+          type: errorObj.constructor.name,
         },
         retryCount: 0,
         maxRetries: 0,
         timestamp: new Date().toISOString(),
-        metadata: this.getDLQMetadata(notificationId)
+        metadata: this.getDLQMetadata(notificationId),
       };
 
       const dlqTopic = this.getDLQTopic();
       await this.kafkaService.publishMessage(dlqTopic, [
         {
           key: notificationId || originalKey,
-          value: dlqMessage
-        }
+          value: dlqMessage,
+        },
       ]);
 
       this.logger.warn(`Sent message to DLQ: ${dlqTopic}, notification_id: ${notificationId}`);
@@ -188,4 +188,3 @@ export abstract class BaseWorkerService {
     }
   }
 }
-

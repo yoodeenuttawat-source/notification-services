@@ -9,7 +9,7 @@ class PushProviderService1 extends base_provider_service_1.BaseProviderService {
         super(circuitBreakerService, kafkaService, {
             failureThreshold: 5,
             timeout: 60000,
-            ...circuitBreakerConfig
+            ...circuitBreakerConfig,
         });
         this.providerName = 'PushProvider1';
         this.channelType = 'push';
@@ -22,20 +22,22 @@ class PushProviderService1 extends base_provider_service_1.BaseProviderService {
             title: payload.subject || null,
             body: payload.content,
             metadata: payload.metadata,
-            idempotentKey: idempotentKey
+            idempotentKey: idempotentKey,
         };
     }
     getUrl() {
-        return process.env.PUSH_PROVIDER1_API_URL || process.env.PROVIDER_API_URL || 'https://api.push-provider1.com/v1/push';
+        return (process.env.PUSH_PROVIDER1_API_URL ||
+            process.env.PROVIDER_API_URL ||
+            'https://api.push-provider1.com/v1/push');
     }
     getHeaders(payload) {
         const idempotentKey = payload.context?.notification_id || 'unknown';
         return {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.PROVIDER_API_KEY || ''}`,
+            Authorization: `Bearer ${process.env.PROVIDER_API_KEY || ''}`,
             'X-Idempotent-Key': idempotentKey,
             'X-Provider': 'PushProvider1',
-            'X-Provider-Version': '1.0'
+            'X-Provider-Version': '1.0',
         };
     }
     async executeSend(payload) {
@@ -51,11 +53,11 @@ class PushProviderService1 extends base_provider_service_1.BaseProviderService {
             headers,
             request,
             messageId,
-            idempotentKey: idempotentKey
+            idempotentKey: idempotentKey,
         }));
         return {
             success: true,
-            messageId: messageId
+            messageId: messageId,
         };
     }
 }

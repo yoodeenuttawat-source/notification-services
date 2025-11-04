@@ -12,4 +12,3 @@ module.exports = {
   },
   testTimeout: 60000, // Increased timeout for e2e tests that wait for workers
 };
-

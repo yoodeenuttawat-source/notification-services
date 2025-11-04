@@ -65,7 +65,9 @@ describe('ErrorClassifier', () => {
       });
 
       it('should return true for temporary errors', () => {
-        expect(ErrorClassifier.isRetriable(new Error('Service temporarily unavailable'))).toBe(true);
+        expect(ErrorClassifier.isRetriable(new Error('Service temporarily unavailable'))).toBe(
+          true
+        );
         expect(ErrorClassifier.isRetriable(new Error('Temporary failure'))).toBe(true);
       });
 
@@ -151,4 +153,3 @@ describe('ErrorClassifier', () => {
     });
   });
 });
-

@@ -66,8 +66,8 @@ describe('EmailProviderService2', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       const result = await service.sendNotification(payload);
@@ -76,7 +76,10 @@ describe('EmailProviderService2', () => {
       expect(result.messageId).toBeDefined();
       expect(result.providerName).toBe('EmailProvider2');
       expect(result.provider_request_id).toBe('test-123');
-      expect(circuitBreakerService.recordSuccess).toHaveBeenCalledWith('EmailProvider2', expect.any(Object));
+      expect(circuitBreakerService.recordSuccess).toHaveBeenCalledWith(
+        'EmailProvider2',
+        expect.any(Object)
+      );
     });
 
     it('should throw CircuitBreakerOpenError when circuit is open', async () => {
@@ -85,7 +88,7 @@ describe('EmailProviderService2', () => {
       const payload = {
         recipient: 'test@example.com',
         subject: 'Test Subject',
-        content: 'Test Content'
+        content: 'Test Content',
       };
 
       await expect(service.sendNotification(payload)).rejects.toThrow(CircuitBreakerOpenError);
@@ -101,8 +104,8 @@ describe('EmailProviderService2', () => {
           event_id: 1,
           event_name: 'TEST',
           channel_id: 1,
-          channel_name: 'EMAIL'
-        }
+          channel_name: 'EMAIL',
+        },
       };
 
       await expect(service.sendNotification(payload)).rejects.toThrow('Email requires subject');
@@ -127,4 +130,3 @@ describe('EmailProviderService2', () => {
     });
   });
 });
-

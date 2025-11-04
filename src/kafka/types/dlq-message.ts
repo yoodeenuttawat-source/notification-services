@@ -20,4 +20,3 @@ export interface DLQMessage<T = any> {
     [key: string]: any;
   };
 }
-

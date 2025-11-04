@@ -6,6 +6,6 @@ import { ProvidersModule } from '../../providers/providers.module';
 
 @Module({
   imports: [KafkaModule, CacheModule, ProvidersModule],
-  providers: [EmailWorkerService]
+  providers: [EmailWorkerService],
 })
 export class EmailWorkerModule {}

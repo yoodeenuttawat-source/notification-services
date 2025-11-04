@@ -2,7 +2,7 @@ import { CircuitBreakerState } from './CircuitBreakerState';
 import {
   CircuitBreakerStrategy,
   CircuitBreakerMetrics,
-  CircuitBreakerConfig
+  CircuitBreakerConfig,
 } from './CircuitBreakerStrategy';
 
 export class DefaultCircuitBreakerStrategy implements CircuitBreakerStrategy {
@@ -15,14 +15,14 @@ export class DefaultCircuitBreakerStrategy implements CircuitBreakerStrategy {
 
       case CircuitBreakerState.OPEN:
         // Check if timeout has passed to allow half-open
-        if (metrics.lastFailureTime && (now - metrics.lastFailureTime) >= config.timeout) {
+        if (metrics.lastFailureTime && now - metrics.lastFailureTime >= config.timeout) {
           return true; // Allow transition to half-open
         }
         return false;
 
       case CircuitBreakerState.HALF_OPEN:
         // Allow limited requests in half-open state
-        return (metrics.successCount + metrics.failureCount) < config.halfOpenMaxCalls;
+        return metrics.successCount + metrics.failureCount < config.halfOpenMaxCalls;
 
       default:
         return false;

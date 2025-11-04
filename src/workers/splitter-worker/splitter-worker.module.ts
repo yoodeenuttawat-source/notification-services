@@ -5,7 +5,6 @@ import { CacheModule } from '../../cache/cache.module';
 
 @Module({
   imports: [KafkaModule, CacheModule],
-  providers: [SplitterWorkerService]
+  providers: [SplitterWorkerService],
 })
 export class SplitterWorkerModule {}
-

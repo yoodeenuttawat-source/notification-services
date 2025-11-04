@@ -24,7 +24,7 @@ let CircuitBreakerService = class CircuitBreakerService {
             failureThreshold: 5,
             successThreshold: 3,
             timeout: 60000,
-            halfOpenMaxCalls: 3
+            halfOpenMaxCalls: 3,
         };
     }
     registerStrategy(providerName, strategy) {
@@ -37,7 +37,7 @@ let CircuitBreakerService = class CircuitBreakerService {
                 successCount: 0,
                 lastFailureTime: null,
                 state: CircuitBreakerState_1.CircuitBreakerState.CLOSED,
-                lastStateChangeTime: Date.now()
+                lastStateChangeTime: Date.now(),
             });
         }
         return this.metrics.get(providerName);
@@ -60,12 +60,10 @@ let CircuitBreakerService = class CircuitBreakerService {
         const newState = strategy.recordSuccess(metrics, effectiveConfig);
         this.updateMetrics(providerName, {
             ...metrics,
-            successCount: metrics.state === CircuitBreakerState_1.CircuitBreakerState.HALF_OPEN
-                ? metrics.successCount + 1
-                : 0,
+            successCount: metrics.state === CircuitBreakerState_1.CircuitBreakerState.HALF_OPEN ? metrics.successCount + 1 : 0,
             failureCount: newState === CircuitBreakerState_1.CircuitBreakerState.CLOSED ? 0 : metrics.failureCount,
             state: newState,
-            lastStateChangeTime: newState !== metrics.state ? Date.now() : metrics.lastStateChangeTime
+            lastStateChangeTime: newState !== metrics.state ? Date.now() : metrics.lastStateChangeTime,
         });
     }
     recordFailure(providerName, config) {
@@ -77,11 +75,13 @@ let CircuitBreakerService = class CircuitBreakerService {
             ...metrics,
             failureCount: metrics.state === CircuitBreakerState_1.CircuitBreakerState.CLOSED
                 ? metrics.failureCount + 1
-                : (newState === CircuitBreakerState_1.CircuitBreakerState.OPEN ? metrics.failureCount + 1 : metrics.failureCount),
+                : newState === CircuitBreakerState_1.CircuitBreakerState.OPEN
+                    ? metrics.failureCount + 1
+                    : metrics.failureCount,
             successCount: newState === CircuitBreakerState_1.CircuitBreakerState.OPEN ? 0 : metrics.successCount,
             lastFailureTime: Date.now(),
             state: newState,
-            lastStateChangeTime: newState !== metrics.state ? Date.now() : metrics.lastStateChangeTime
+            lastStateChangeTime: newState !== metrics.state ? Date.now() : metrics.lastStateChangeTime,
         });
     }
     getState(providerName) {
@@ -100,13 +100,13 @@ let CircuitBreakerService = class CircuitBreakerService {
         const metrics = this.getMetrics(providerName);
         if (metrics.state === CircuitBreakerState_1.CircuitBreakerState.OPEN && metrics.lastFailureTime) {
             const now = Date.now();
-            if ((now - metrics.lastFailureTime) >= config.timeout) {
+            if (now - metrics.lastFailureTime >= config.timeout) {
                 this.updateMetrics(providerName, {
                     ...metrics,
                     state: CircuitBreakerState_1.CircuitBreakerState.HALF_OPEN,
                     lastStateChangeTime: now,
                     successCount: 0,
-                    failureCount: 0
+                    failureCount: 0,
                 });
             }
         }

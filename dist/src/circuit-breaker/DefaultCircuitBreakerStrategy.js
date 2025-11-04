@@ -9,12 +9,12 @@ class DefaultCircuitBreakerStrategy {
             case CircuitBreakerState_1.CircuitBreakerState.CLOSED:
                 return true;
             case CircuitBreakerState_1.CircuitBreakerState.OPEN:
-                if (metrics.lastFailureTime && (now - metrics.lastFailureTime) >= config.timeout) {
+                if (metrics.lastFailureTime && now - metrics.lastFailureTime >= config.timeout) {
                     return true;
                 }
                 return false;
             case CircuitBreakerState_1.CircuitBreakerState.HALF_OPEN:
-                return (metrics.successCount + metrics.failureCount) < config.halfOpenMaxCalls;
+                return metrics.successCount + metrics.failureCount < config.halfOpenMaxCalls;
             default:
                 return false;
         }

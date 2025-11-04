@@ -11,10 +11,10 @@ export interface CircuitBreakerMetrics {
 }
 
 export interface CircuitBreakerConfig {
-  failureThreshold: number;        // Open circuit after N failures
-  successThreshold: number;         // Close circuit after N successes in half-open
-  timeout: number;                  // Time to wait before half-open (ms)
-  halfOpenMaxCalls: number;         // Max calls to allow in half-open state
+  failureThreshold: number; // Open circuit after N failures
+  successThreshold: number; // Close circuit after N successes in half-open
+  timeout: number; // Time to wait before half-open (ms)
+  halfOpenMaxCalls: number; // Max calls to allow in half-open state
 }
 
 export interface CircuitBreakerStrategy {

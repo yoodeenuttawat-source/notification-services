@@ -9,7 +9,7 @@ class PushProviderService2 extends base_provider_service_1.BaseProviderService {
         super(circuitBreakerService, kafkaService, {
             failureThreshold: 3,
             timeout: 45000,
-            ...circuitBreakerConfig
+            ...circuitBreakerConfig,
         });
         this.providerName = 'PushProvider2';
         this.channelType = 'push';
@@ -21,23 +21,25 @@ class PushProviderService2 extends base_provider_service_1.BaseProviderService {
             target: payload.recipient,
             notification: {
                 title: payload.subject || null,
-                message: payload.content
+                message: payload.content,
             },
             metadata: payload.metadata,
-            idempotentKey: idempotentKey
+            idempotentKey: idempotentKey,
         };
     }
     getUrl() {
-        return process.env.PUSH_PROVIDER2_API_URL || process.env.PROVIDER_API_URL || 'https://api.push-provider2.com/v1/notifications';
+        return (process.env.PUSH_PROVIDER2_API_URL ||
+            process.env.PROVIDER_API_URL ||
+            'https://api.push-provider2.com/v1/notifications');
     }
     getHeaders(payload) {
         const idempotentKey = payload.context?.notification_id || 'unknown';
         return {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.PROVIDER_API_KEY || ''}`,
+            Authorization: `Bearer ${process.env.PROVIDER_API_KEY || ''}`,
             'X-Idempotent-Key': idempotentKey,
             'X-Provider': 'PushProvider2',
-            'X-Provider-Version': '2.0'
+            'X-Provider-Version': '2.0',
         };
     }
     async executeSend(payload) {
@@ -53,11 +55,11 @@ class PushProviderService2 extends base_provider_service_1.BaseProviderService {
             headers,
             request,
             messageId,
-            idempotentKey: idempotentKey
+            idempotentKey: idempotentKey,
         }));
         return {
             success: true,
-            messageId: messageId
+            messageId: messageId,
         };
     }
 }

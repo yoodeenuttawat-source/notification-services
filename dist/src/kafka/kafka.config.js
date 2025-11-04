@@ -9,8 +9,8 @@ const getKafkaConfig = () => {
         groupId: process.env.KAFKA_GROUP_ID || 'notification-service-group',
         retry: {
             retries: parseInt(process.env.KAFKA_RETRIES || '8', 10),
-            initialRetryTime: parseInt(process.env.KAFKA_INITIAL_RETRY_TIME || '100', 10)
-        }
+            initialRetryTime: parseInt(process.env.KAFKA_INITIAL_RETRY_TIME || '100', 10),
+        },
     };
 };
 exports.getKafkaConfig = getKafkaConfig;
@@ -22,6 +22,6 @@ exports.KAFKA_TOPICS = {
     PROVIDER_REQUEST_RESPONSE: 'provider_request_response',
     NOTIFICATION_DLQ: 'notification.dlq',
     PUSH_NOTIFICATION_DLQ: 'notification.push.dlq',
-    EMAIL_NOTIFICATION_DLQ: 'notification.email.dlq'
+    EMAIL_NOTIFICATION_DLQ: 'notification.email.dlq',
 };
 //# sourceMappingURL=kafka.config.js.map

@@ -37,12 +37,13 @@ export class EmailWorkerService extends ChannelWorkerBaseService implements OnMo
 
   async onModuleInit() {
     this.logger.log('Initializing email worker...');
-    
-    this.logger.log(`Creating consumer for group: email-worker-group, topics: ${KAFKA_TOPICS.EMAIL_NOTIFICATION}`);
-    const consumer = await this.kafkaService.createConsumer(
-      'email-worker-group',
-      [KAFKA_TOPICS.EMAIL_NOTIFICATION]
+
+    this.logger.log(
+      `Creating consumer for group: email-worker-group, topics: ${KAFKA_TOPICS.EMAIL_NOTIFICATION}`
     );
+    const consumer = await this.kafkaService.createConsumer('email-worker-group', [
+      KAFKA_TOPICS.EMAIL_NOTIFICATION,
+    ]);
 
     this.logger.log('Starting to consume messages from email notification topic...');
     await this.kafkaService.consumeMessages(consumer, async (payload) => {
@@ -54,7 +55,7 @@ export class EmailWorkerService extends ChannelWorkerBaseService implements OnMo
 
   private async processEmailNotification(payload: EachMessagePayload) {
     const originalMessage = payload.message.value.toString();
-    
+
     try {
       // Parse and validate message
       const message = await this.parseMessage<ChannelMessage>(originalMessage);
@@ -62,7 +63,9 @@ export class EmailWorkerService extends ChannelWorkerBaseService implements OnMo
 
       // Check for duplicate message
       if (this.isDuplicate(message.notification_id)) {
-        this.logger.warn(`Duplicate email notification detected, skipping: ${message.notification_id}`);
+        this.logger.warn(
+          `Duplicate email notification detected, skipping: ${message.notification_id}`
+        );
         return; // Skip processing duplicate message
       }
 
@@ -70,7 +73,7 @@ export class EmailWorkerService extends ChannelWorkerBaseService implements OnMo
       this.markAsProcessed(message.notification_id);
 
       // Validate email-specific requirements
-      if (!await this.validateEmailMessage(message)) return;
+      if (!(await this.validateEmailMessage(message))) return;
 
       // Get providers and validate
       const providers = await this.getProviders(message.channel_id);
@@ -81,7 +84,7 @@ export class EmailWorkerService extends ChannelWorkerBaseService implements OnMo
 
       // Try to send notification via providers
       const result = await this.trySendNotification(message, providers, 'Email');
-      
+
       // Handle failure if all providers failed
       if (!result.success) {
         await this.handleAllProvidersFailed(
@@ -102,7 +105,6 @@ export class EmailWorkerService extends ChannelWorkerBaseService implements OnMo
     }
   }
 
-
   private async validateEmailMessage(message: ChannelMessage): Promise<boolean> {
     if (!message.template_subject) {
       this.logger.warn(`Email notification ${message.notification_id} missing subject`);
@@ -120,5 +122,4 @@ export class EmailWorkerService extends ChannelWorkerBaseService implements OnMo
     }
     return true;
   }
-
 }

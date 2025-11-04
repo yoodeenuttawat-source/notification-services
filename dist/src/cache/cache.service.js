@@ -44,7 +44,7 @@ let CacheService = CacheService_1 = class CacheService {
             this.inMemoryCache.set(key, {
                 data: value,
                 expiresAt: expiresAt,
-                lastAccessed: Date.now()
+                lastAccessed: Date.now(),
             });
             const entry = this.inMemoryCache.get(key);
             this.inMemoryCache.delete(key);
@@ -57,7 +57,7 @@ let CacheService = CacheService_1 = class CacheService {
         this.inMemoryCache.set(key, {
             data: value,
             expiresAt: expiresAt,
-            lastAccessed: Date.now()
+            lastAccessed: Date.now(),
         });
     }
     delete(key) {
@@ -91,8 +91,7 @@ let CacheService = CacheService_1 = class CacheService {
         if (entriesToEvict <= 0) {
             return;
         }
-        const entries = Array.from(this.inMemoryCache.entries())
-            .sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+        const entries = Array.from(this.inMemoryCache.entries()).sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
         let evicted = 0;
         for (let i = 0; i < entriesToEvict && i < entries.length; i++) {
             this.inMemoryCache.delete(entries[i][0]);
@@ -106,7 +105,7 @@ let CacheService = CacheService_1 = class CacheService {
         return {
             size: this.inMemoryCache.size,
             maxSize: this.maxSize,
-            keys: Array.from(this.inMemoryCache.keys())
+            keys: Array.from(this.inMemoryCache.keys()),
         };
     }
 };

@@ -3,7 +3,7 @@ import { CircuitBreakerState } from './CircuitBreakerState';
 import {
   CircuitBreakerMetrics,
   CircuitBreakerConfig,
-  CircuitBreakerStrategy
+  CircuitBreakerStrategy,
 } from './CircuitBreakerStrategy';
 import { DefaultCircuitBreakerStrategy } from './DefaultCircuitBreakerStrategy';
 
@@ -13,14 +13,12 @@ export class CircuitBreakerService {
   private strategies: Map<string, CircuitBreakerStrategy> = new Map();
   private defaultConfig: CircuitBreakerConfig;
 
-  constructor(
-    @Optional() defaultConfig?: CircuitBreakerConfig
-  ) {
+  constructor(@Optional() defaultConfig?: CircuitBreakerConfig) {
     this.defaultConfig = defaultConfig || {
       failureThreshold: 5,
       successThreshold: 3,
       timeout: 60000, // 60 seconds
-      halfOpenMaxCalls: 3
+      halfOpenMaxCalls: 3,
     };
   }
 
@@ -41,7 +39,7 @@ export class CircuitBreakerService {
         successCount: 0,
         lastFailureTime: null,
         state: CircuitBreakerState.CLOSED,
-        lastStateChangeTime: Date.now()
+        lastStateChangeTime: Date.now(),
       });
     }
     return this.metrics.get(providerName)!;
@@ -80,12 +78,10 @@ export class CircuitBreakerService {
     const newState = strategy.recordSuccess(metrics, effectiveConfig);
     this.updateMetrics(providerName, {
       ...metrics,
-      successCount: metrics.state === CircuitBreakerState.HALF_OPEN 
-        ? metrics.successCount + 1 
-        : 0,
+      successCount: metrics.state === CircuitBreakerState.HALF_OPEN ? metrics.successCount + 1 : 0,
       failureCount: newState === CircuitBreakerState.CLOSED ? 0 : metrics.failureCount,
       state: newState,
-      lastStateChangeTime: newState !== metrics.state ? Date.now() : metrics.lastStateChangeTime
+      lastStateChangeTime: newState !== metrics.state ? Date.now() : metrics.lastStateChangeTime,
     });
   }
 
@@ -100,13 +96,16 @@ export class CircuitBreakerService {
     const newState = strategy.recordFailure(metrics, effectiveConfig);
     this.updateMetrics(providerName, {
       ...metrics,
-      failureCount: metrics.state === CircuitBreakerState.CLOSED 
-        ? metrics.failureCount + 1 
-        : (newState === CircuitBreakerState.OPEN ? metrics.failureCount + 1 : metrics.failureCount),
+      failureCount:
+        metrics.state === CircuitBreakerState.CLOSED
+          ? metrics.failureCount + 1
+          : newState === CircuitBreakerState.OPEN
+            ? metrics.failureCount + 1
+            : metrics.failureCount,
       successCount: newState === CircuitBreakerState.OPEN ? 0 : metrics.successCount,
       lastFailureTime: Date.now(),
       state: newState,
-      lastStateChangeTime: newState !== metrics.state ? Date.now() : metrics.lastStateChangeTime
+      lastStateChangeTime: newState !== metrics.state ? Date.now() : metrics.lastStateChangeTime,
     });
   }
 
@@ -143,17 +142,17 @@ export class CircuitBreakerService {
    */
   private updateStateIfNeeded(providerName: string, config: CircuitBreakerConfig): void {
     const metrics = this.getMetrics(providerName);
-    
+
     if (metrics.state === CircuitBreakerState.OPEN && metrics.lastFailureTime) {
       const now = Date.now();
-      if ((now - metrics.lastFailureTime) >= config.timeout) {
+      if (now - metrics.lastFailureTime >= config.timeout) {
         // Transition to half-open
         this.updateMetrics(providerName, {
           ...metrics,
           state: CircuitBreakerState.HALF_OPEN,
           lastStateChangeTime: now,
           successCount: 0,
-          failureCount: 0
+          failureCount: 0,
         });
       }
     }

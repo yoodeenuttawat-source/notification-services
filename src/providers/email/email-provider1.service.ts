@@ -1,4 +1,8 @@
-import { BaseProviderService, NotificationPayload, NotificationResult } from '../base-provider.service';
+import {
+  BaseProviderService,
+  NotificationPayload,
+  NotificationResult,
+} from '../base-provider.service';
 import { CircuitBreakerService } from '../../circuit-breaker/CircuitBreakerService';
 import { CircuitBreakerConfig } from '../../circuit-breaker/CircuitBreakerStrategy';
 import { KafkaService } from '../../kafka/kafka.service';
@@ -18,7 +22,7 @@ export class EmailProviderService1 extends BaseProviderService {
     super(circuitBreakerService, kafkaService, {
       failureThreshold: 5,
       timeout: 60000,
-      ...circuitBreakerConfig
+      ...circuitBreakerConfig,
     });
   }
 
@@ -31,26 +35,32 @@ export class EmailProviderService1 extends BaseProviderService {
       metadata: payload.metadata,
       idempotentKey: idempotentKey,
       from: process.env.EMAIL_FROM || 'noreply@example.com',
-      to: payload.recipient
+      to: payload.recipient,
     };
   }
 
   protected getUrl(): string {
-    return process.env.EMAIL_PROVIDER1_API_URL || process.env.PROVIDER_API_URL || 'https://api.email-provider1.com/v1/send';
+    return (
+      process.env.EMAIL_PROVIDER1_API_URL ||
+      process.env.PROVIDER_API_URL ||
+      'https://api.email-provider1.com/v1/send'
+    );
   }
 
   protected getHeaders(payload: NotificationPayload): Record<string, string> {
     const idempotentKey = payload.context?.notification_id || 'unknown';
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.PROVIDER_API_KEY || ''}`,
+      Authorization: `Bearer ${process.env.PROVIDER_API_KEY || ''}`,
       'X-Idempotent-Key': idempotentKey,
       'X-Provider': 'EmailProvider1',
-      'X-Provider-Version': '1.0'
+      'X-Provider-Version': '1.0',
     };
   }
 
-  protected async executeSend(payload: NotificationPayload): Promise<Omit<NotificationResult, 'providerName'>> {
+  protected async executeSend(
+    payload: NotificationPayload
+  ): Promise<Omit<NotificationResult, 'providerName'>> {
     if (!payload.subject) {
       throw new Error('Email requires subject');
     }
@@ -60,21 +70,22 @@ export class EmailProviderService1 extends BaseProviderService {
     const request = this.getRequest(payload);
     const headers = this.getHeaders(payload);
     const url = this.getUrl();
-    
-    this.logger.log(JSON.stringify({
-      provider: this.providerName,
-      action: 'sending_email_notification',
-      url,
-      headers,
-      request,
-      messageId,
-      idempotentKey: idempotentKey
-    }));
+
+    this.logger.log(
+      JSON.stringify({
+        provider: this.providerName,
+        action: 'sending_email_notification',
+        url,
+        headers,
+        request,
+        messageId,
+        idempotentKey: idempotentKey,
+      })
+    );
 
     return {
       success: true,
-      messageId: messageId
+      messageId: messageId,
     };
   }
 }
-

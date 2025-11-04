@@ -33,7 +33,7 @@ export class KafkaTestHelper {
     });
 
     await consumer.connect();
-    
+
     // Retry subscription with exponential backoff in case topic doesn't exist yet
     let retries = 5;
     let lastError: Error | null = null;
@@ -49,7 +49,7 @@ export class KafkaTestHelper {
         }
       }
     }
-    
+
     if (retries === 0 && lastError) {
       throw new Error(`Failed to subscribe to topic ${topic} after retries: ${lastError.message}`);
     }
@@ -66,9 +66,7 @@ export class KafkaTestHelper {
           topic: payload.topic,
           partition: payload.partition,
           key: payload.message.key?.toString() || null,
-          value: payload.message.value
-            ? JSON.parse(payload.message.value.toString())
-            : null,
+          value: payload.message.value ? JSON.parse(payload.message.value.toString()) : null,
           timestamp: payload.message.timestamp || '',
         };
 
@@ -93,7 +91,7 @@ export class KafkaTestHelper {
 
     while (Date.now() - startTime < timeout) {
       const messages = this.messages.get(topic) || [];
-      
+
       if (messages.length > 0) {
         if (predicate) {
           const matching = messages.find(predicate);
@@ -149,4 +147,3 @@ export class KafkaTestHelper {
     return this.kafka;
   }
 }
-
