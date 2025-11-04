@@ -64,8 +64,8 @@ npm run start:all
 # Terminal 1: API
 npm run start:api
 
-# Terminal 2: Notification Worker
-npm run start:notification-worker
+# Terminal 2: Splitter Worker
+npm run start:splitter-worker
 
 # Terminal 3: Push Worker
 npm run start:push-worker
@@ -127,7 +127,7 @@ For detailed e2e test setup and troubleshooting, see [src/test/README.md](src/te
 **Quick Start:**
 1. Start infrastructure: `docker-compose -f docker-compose-infra.yml up -d`
 2. Start all workers (in separate terminals):
-   - `npm run start:notification-worker`
+   - `npm run start:splitter-worker`
    - `npm run start:push-worker`
    - `npm run start:email-worker`
 3. Run e2e tests: `npm run test:e2e`
@@ -152,7 +152,7 @@ notification-services/
 ├── src/                            # Source code
 │   ├── notification-api/          # REST API endpoint
 │   ├── workers/                    # Kafka workers
-│   │   ├── notification-worker/   # Routes messages to channels
+│   │   ├── splitter-worker/   # Routes messages to channels
 │   │   ├── push-worker/            # Processes push notifications
 │   │   ├── email-worker/           # Processes email notifications
 │   │   └── dlq-replay-worker/      # Replays DLQ messages
@@ -180,7 +180,7 @@ notification-services/
 | Script | Description |
 |--------|-------------|
 | `npm run start:api` | Start API server |
-| `npm run start:notification-worker` | Start notification worker |
+| `npm run start:splitter-worker` | Start splitter worker |
 | `npm run start:push-worker` | Start push worker |
 | `npm run start:email-worker` | Start email worker |
 | `npm run start:all` | Start API and all workers |
@@ -211,7 +211,7 @@ This will be used by all services by default.
 For service-specific configurations, you can create `.env` files in each service directory:
 
 - `src/notification-api/.env` - API-specific configuration
-- `src/workers/notification-worker/.env` - Notification worker configuration
+- `src/workers/splitter-worker/.env` - Splitter worker configuration
 - `src/workers/push-worker/.env` - Push worker configuration
 - `src/workers/email-worker/.env` - Email worker configuration
 - `src/workers/dlq-replay-worker/.env` - DLQ replay worker configuration

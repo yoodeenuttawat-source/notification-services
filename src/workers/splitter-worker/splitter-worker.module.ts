@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { NotificationWorkerService } from './notification-worker.service';
+import { SplitterWorkerService } from './splitter-worker.service';
 import { KafkaModule } from '../../kafka/kafka.module';
 import { CacheModule } from '../../cache/cache.module';
 
 @Module({
   imports: [KafkaModule, CacheModule],
-  providers: [NotificationWorkerService]
+  providers: [SplitterWorkerService]
 })
-export class NotificationWorkerModule {}
+export class SplitterWorkerModule {}
+

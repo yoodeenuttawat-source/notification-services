@@ -16,15 +16,27 @@ const kafka_service_1 = require("../../kafka/kafka.service");
 const config_service_1 = require("../../cache/config.service");
 const provider_factory_service_1 = require("../../providers/provider-factory.service");
 const kafka_config_1 = require("../../kafka/kafka.config");
+const channel_worker_base_service_1 = require("../channel-worker-base.service");
 const cache_service_1 = require("../../cache/cache.service");
-let PushWorkerService = PushWorkerService_1 = class PushWorkerService {
-    constructor(kafkaService, configService, providerFactory, cacheService) {
+let PushWorkerService = PushWorkerService_1 = class PushWorkerService extends channel_worker_base_service_1.ChannelWorkerBaseService {
+    constructor(kafkaService, cacheService, configService, providerFactory) {
+        super(kafkaService, cacheService, configService, providerFactory, PushWorkerService_1.name);
         this.kafkaService = kafkaService;
+        this.cacheService = cacheService;
         this.configService = configService;
         this.providerFactory = providerFactory;
-        this.cacheService = cacheService;
-        this.logger = new common_1.Logger(PushWorkerService_1.name);
-        this.DEDUP_TTL_SECONDS = 120;
+    }
+    getDedupKeyPrefix() {
+        return 'dedup:push:';
+    }
+    getDefaultChannelName() {
+        return 'PUSH';
+    }
+    getDLQTopic() {
+        return kafka_config_1.KAFKA_TOPICS.PUSH_NOTIFICATION_DLQ;
+    }
+    getChannelTopic() {
+        return kafka_config_1.KAFKA_TOPICS.PUSH_NOTIFICATION;
     }
     async onModuleInit() {
         this.logger.log('Initializing push worker...');
@@ -52,178 +64,22 @@ let PushWorkerService = PushWorkerService_1 = class PushWorkerService {
                 await this.handleNoProviders(message, originalMessage, payload.message.key?.toString());
                 return;
             }
-            const result = await this.trySendNotification(message, providers);
+            const result = await this.trySendNotification(message, providers, 'Push');
             if (!result.success) {
-                await this.handleAllProvidersFailed(originalMessage, payload.message.key?.toString(), message, result.error);
+                await this.handleAllProvidersFailed(originalMessage, payload.message.key?.toString(), message, result.error, 'Push');
             }
         }
         catch (error) {
-            this.logger.error('Unexpected error in push notification processing:', error);
-            await this.handleProcessingError(originalMessage, payload.message.key?.toString(), error);
+            await this.handleProcessingError(originalMessage, payload.message.key?.toString(), error, kafka_config_1.KAFKA_TOPICS.NOTIFICATION);
         }
-    }
-    async parseMessage(originalMessage) {
-        try {
-            return JSON.parse(originalMessage);
-        }
-        catch (parseError) {
-            const parseErr = parseError instanceof Error ? parseError : new Error(String(parseError));
-            this.logger.error('JSON parse error (non-retriable):', parseErr);
-            await this.publishDeliveryLog({
-                notification_id: 'unknown',
-                event_id: 0,
-                event_name: 'unknown',
-                channel_id: 0,
-                channel_name: 'PUSH',
-                stage: 'processing_failed',
-                status: 'failed',
-                error_message: `Invalid JSON message format: ${parseErr.message}`,
-            });
-            return null;
-        }
-    }
-    async getProviders(channelId) {
-        try {
-            return await this.configService.getProvidersByChannel(channelId);
-        }
-        catch (error) {
-            this.logger.error(`Error getting providers for channel_id ${channelId}:`, error);
-            return null;
-        }
-    }
-    async handleNoProviders(message, originalMessage, originalKey) {
-        this.logger.warn(`No providers found for channel_id: ${message.channel_id}`);
-        await this.publishDeliveryLog({
-            notification_id: message.notification_id,
-            event_id: message.event_id,
-            event_name: message.event_name,
-            channel_id: message.channel_id,
-            channel_name: message.channel_name,
-            stage: 'provider_called',
-            status: 'failed',
-            error_message: 'No providers available - configuration issue',
-        });
-        await this.sendToDLQ(originalMessage, kafka_config_1.KAFKA_TOPICS.PUSH_NOTIFICATION, originalKey, Error('No providers available - configuration issue'), message.notification_id);
-    }
-    async trySendNotification(message, providers) {
-        this.logger.log(`Processing push notification: ${message.notification_id}`);
-        for (const providerConfig of providers) {
-            const provider = this.providerFactory.getProvider(providerConfig.name);
-            if (!provider) {
-                this.logger.warn(`Provider ${providerConfig.name} not found in factory`);
-                continue;
-            }
-            try {
-                await provider.sendNotification({
-                    recipient: message.recipient,
-                    subject: message.template_subject,
-                    content: message.template_content,
-                    metadata: message.metadata,
-                    context: {
-                        notification_id: message.notification_id,
-                        event_id: message.event_id,
-                        event_name: message.event_name,
-                        channel_id: message.channel_id,
-                        channel_name: message.channel_name,
-                    }
-                });
-                this.logger.log(`Push notification ${message.notification_id} sent via ${providerConfig.name}`);
-                return { success: true, error: null };
-            }
-            catch (providerError) {
-                continue;
-            }
-        }
-        return { success: false, error: new Error('All providers failed') };
-    }
-    async handleAllProvidersFailed(originalMessage, originalKey, message, error) {
-        this.logger.error(`All push providers failed for notification ${message.notification_id}:`, error);
-        await this.publishDeliveryLog({
-            notification_id: message.notification_id,
-            event_id: message.event_id,
-            event_name: message.event_name,
-            channel_id: message.channel_id,
-            channel_name: message.channel_name,
-            stage: 'provider_failed',
-            status: 'failed',
-            error_message: error?.message || 'Non-retriable error: All providers failed',
-        });
-        await this.sendToDLQ(originalMessage, kafka_config_1.KAFKA_TOPICS.PUSH_NOTIFICATION, originalKey, error, message.notification_id);
-    }
-    async handleProcessingError(originalMessage, originalKey, error) {
-        this.logger.error('Error processing push notification:', error);
-        const errorObj = error instanceof Error ? error : new Error(String(error));
-        await this.publishDeliveryLog({
-            notification_id: 'unknown',
-            event_id: 0,
-            event_name: 'unknown',
-            channel_id: 0,
-            channel_name: 'PUSH',
-            stage: 'processing_failed',
-            status: 'failed',
-            error_message: errorObj.message
-        });
-    }
-    async publishDeliveryLog(log) {
-        const deliveryLog = {
-            ...log,
-            timestamp: new Date().toISOString()
-        };
-        await this.kafkaService.publishMessage(kafka_config_1.KAFKA_TOPICS.DELIVERY_LOGS, [
-            {
-                key: log.notification_id,
-                value: deliveryLog
-            }
-        ]);
-    }
-    async sendToDLQ(originalMessage, originalTopic, originalKey, error, notificationId) {
-        try {
-            const errorObj = error instanceof Error ? error : new Error(String(error));
-            const dlqMessage = {
-                originalMessage: JSON.parse(originalMessage),
-                originalTopic,
-                originalKey,
-                error: {
-                    message: errorObj.message,
-                    stack: errorObj.stack,
-                    type: errorObj.constructor.name
-                },
-                retryCount: 0,
-                maxRetries: 0,
-                timestamp: new Date().toISOString(),
-                metadata: {
-                    notification_id: notificationId,
-                    channel_name: 'PUSH'
-                }
-            };
-            await this.kafkaService.publishMessage(kafka_config_1.KAFKA_TOPICS.PUSH_NOTIFICATION_DLQ, [
-                {
-                    key: notificationId || originalKey,
-                    value: dlqMessage
-                }
-            ]);
-            this.logger.warn(`Sent message to DLQ: ${kafka_config_1.KAFKA_TOPICS.PUSH_NOTIFICATION_DLQ}, notification_id: ${notificationId}`);
-        }
-        catch (dlqError) {
-            this.logger.error('Failed to send message to DLQ:', dlqError);
-        }
-    }
-    isDuplicate(notificationId) {
-        const cacheKey = `dedup:push:${notificationId}`;
-        const cached = this.cacheService.get(cacheKey);
-        return cached === true;
-    }
-    markAsProcessed(notificationId) {
-        const cacheKey = `dedup:push:${notificationId}`;
-        this.cacheService.set(cacheKey, true, this.DEDUP_TTL_SECONDS);
     }
 };
 exports.PushWorkerService = PushWorkerService;
 exports.PushWorkerService = PushWorkerService = PushWorkerService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [kafka_service_1.KafkaService,
+        cache_service_1.CacheService,
         config_service_1.ConfigService,
-        provider_factory_service_1.ProviderFactoryService,
-        cache_service_1.CacheService])
+        provider_factory_service_1.ProviderFactoryService])
 ], PushWorkerService);
 //# sourceMappingURL=push-worker.service.js.map

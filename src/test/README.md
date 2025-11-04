@@ -51,9 +51,9 @@ You should see 4 event types: `CHAT_MESSAGE`, `PURCHASE`, `PAYMENT_REMINDER`, `S
 
 **CRITICAL:** Integration tests require all three workers to be running. Start them in separate terminals:
 
-#### Terminal 1: Notification Worker
+#### Terminal 1: Splitter Worker
 ```bash
-npm run start:notification-worker
+npm run start:splitter-worker
 ```
 This worker routes messages from the `notification` topic to `notification.push` and `notification.email` topics.
 
