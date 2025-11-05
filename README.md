@@ -12,6 +12,7 @@ A notification service built with NestJS, PostgreSQL, and Kafka that handles mul
 - **Template Rendering**: Dynamic template rendering with variable substitution
 - **Message Deduplication**: Prevents duplicate processing
 - **Comprehensive Logging**: Delivery logs and provider request/response tracking
+- **Prometheus Metrics**: Comprehensive monitoring metrics exposed via `/metrics` endpoint
 
 ## Architecture
 
@@ -83,6 +84,20 @@ The API runs on port 3000 by default (configurable via `API_PORT` environment va
 curl http://localhost:3000/health
 ```
 
+**Prometheus Metrics:**
+```bash
+curl http://localhost:3000/metrics
+```
+
+The metrics endpoint exposes Prometheus-compatible metrics for monitoring:
+- Notification API request metrics (duration, count, status)
+- Worker processing metrics (duration, count, status)
+- Provider API metrics (duration, count, status)
+- Circuit breaker state
+- Kafka publish/consume metrics
+- Database query metrics
+- DLQ replay metrics
+
 **Send a notification:**
 ```bash
 npm run call-api
@@ -138,7 +153,7 @@ For detailed e2e test setup and troubleshooting, see [src/test/README.md](src/te
 # Run all tests (unit + e2e)
 npm run test:all
 
-# Run with coverage currently minimum threshold's set to 90% (unit tests only)
+# Run with coverage (minimum thresholds: 90% for all metrics)
 npm run test:cov
 
 # Run in watch mode (unit tests only)
@@ -163,6 +178,7 @@ notification-services/
 │   ├── kafka/                      # Kafka configuration and types
 │   ├── cache/                      # In-memory cache service
 │   ├── circuit-breaker/            # Circuit breaker implementation
+│   ├── metrics/                    # Prometheus metrics collection
 │   └── test/                       # Test utilities
 │   └── **/*.spec.ts                # Unit tests
 ├── e2e/                            # End-to-end tests

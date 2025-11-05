@@ -6,17 +6,22 @@ import { KAFKA_TOPICS } from '../../kafka/kafka.config';
 import { ChannelMessage } from '../../kafka/types/channel-message';
 import { ChannelWorkerBaseService } from '../channel-worker-base.service';
 import { CacheService } from '../../cache/cache.service';
+import { MetricsService } from '../../metrics/metrics.service';
 import { EachMessagePayload } from 'kafkajs';
 
 @Injectable()
 export class PushWorkerService extends ChannelWorkerBaseService implements OnModuleInit {
+  private readonly workerName = 'push-worker';
+  private readonly topic = KAFKA_TOPICS.PUSH_NOTIFICATION;
+
   constructor(
     protected readonly kafkaService: KafkaService,
     protected readonly cacheService: CacheService,
     protected readonly configService: ConfigService,
-    protected readonly providerFactory: ProviderFactoryService
+    protected readonly providerFactory: ProviderFactoryService,
+    protected readonly metricsService: MetricsService
   ) {
-    super(kafkaService, cacheService, configService, providerFactory, PushWorkerService.name);
+    super(kafkaService, cacheService, configService, providerFactory, PushWorkerService.name, metricsService);
   }
 
   protected getDedupKeyPrefix(): string {
@@ -46,25 +51,46 @@ export class PushWorkerService extends ChannelWorkerBaseService implements OnMod
     ]);
 
     this.logger.log('Starting to consume messages from push notification topic...');
-    await this.kafkaService.consumeMessages(consumer, async (payload) => {
-      await this.processPushNotification(payload);
-    });
+    await this.kafkaService.consumeMessages(
+      consumer,
+      async (payload) => {
+        await this.processPushNotification(payload);
+      },
+      KAFKA_TOPICS.PUSH_NOTIFICATION,
+      'push-worker-group'
+    );
 
     this.logger.log('Push worker started and ready to process messages');
   }
 
   private async processPushNotification(payload: EachMessagePayload) {
     const originalMessage = payload.message.value.toString();
+    const startTime = process.hrtime.bigint();
+    let status = 'success';
 
     try {
       // Parse and validate message
       const message = await this.parseMessage<ChannelMessage>(originalMessage);
-      if (!message) return;
+      if (!message) {
+        status = 'failure';
+        const duration = Number(process.hrtime.bigint() - startTime) / 1e9;
+        this.metricsService.workerProcessingMetrics.observe(
+          { worker: this.workerName, topic: this.topic, status },
+          duration
+        );
+        return;
+      }
 
       // Check for duplicate message
       if (await this.isDuplicate(message.notification_id)) {
         this.logger.warn(
           `Duplicate push notification detected, skipping: ${message.notification_id}`
+        );
+        status = 'success'; // Duplicate is considered successful (idempotent)
+        const duration = Number(process.hrtime.bigint() - startTime) / 1e9;
+        this.metricsService.workerProcessingMetrics.observe(
+          { worker: this.workerName, topic: this.topic, status },
+          duration
         );
         return; // Skip processing duplicate message
       }
@@ -75,6 +101,12 @@ export class PushWorkerService extends ChannelWorkerBaseService implements OnMod
       // Get providers and validate
       const providers = await this.getProviders(message.channel_id);
       if (!providers || providers.length === 0) {
+        status = 'failure';
+        const duration = Number(process.hrtime.bigint() - startTime) / 1e9;
+        this.metricsService.workerProcessingMetrics.observe(
+          { worker: this.workerName, topic: this.topic, status },
+          duration
+        );
         await this.handleNoProviders(message, originalMessage, payload.message.key?.toString());
         return;
       }
@@ -84,6 +116,12 @@ export class PushWorkerService extends ChannelWorkerBaseService implements OnMod
 
       // Handle failure if all providers failed
       if (!result.success) {
+        status = 'failure';
+        const duration = Number(process.hrtime.bigint() - startTime) / 1e9;
+        this.metricsService.workerProcessingMetrics.observe(
+          { worker: this.workerName, topic: this.topic, status },
+          duration
+        );
         await this.handleAllProvidersFailed(
           originalMessage,
           payload.message.key?.toString(),
@@ -91,8 +129,21 @@ export class PushWorkerService extends ChannelWorkerBaseService implements OnMod
           result.error,
           'Push'
         );
+      } else {
+        status = 'success';
+        const duration = Number(process.hrtime.bigint() - startTime) / 1e9;
+        this.metricsService.workerProcessingMetrics.observe(
+          { worker: this.workerName, topic: this.topic, status },
+          duration
+        );
       }
     } catch (error) {
+      status = 'failure';
+      const duration = Number(process.hrtime.bigint() - startTime) / 1e9;
+      this.metricsService.workerProcessingMetrics.observe(
+        { worker: this.workerName, topic: this.topic, status },
+        duration
+      );
       await this.handleProcessingError(
         originalMessage,
         payload.message.key?.toString(),

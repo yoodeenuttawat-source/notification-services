@@ -220,4 +220,211 @@ describe('DatabaseService', () => {
       expect(pool).toBe(mockPool);
     });
   });
+
+  describe('onModuleInit', () => {
+    it('should test connection successfully', async () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      mockPool.query.mockResolvedValue({ rows: [], rowCount: 0 });
+
+      await service.onModuleInit();
+
+      expect(mockPool.query).toHaveBeenCalledWith('SELECT NOW()');
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should throw error on connection failure', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const error = new Error('Database connection failed');
+      mockPool.query.mockRejectedValue(error);
+
+      await expect(service.onModuleInit()).rejects.toThrow('Database connection failed');
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Database connection failed:', error);
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('onModuleDestroy', () => {
+    it('should end the pool', async () => {
+      await service.onModuleDestroy();
+      expect(mockPool.end).toHaveBeenCalled();
+    });
+  });
+
+  describe('query error handling', () => {
+    let mockMetricsService: any;
+
+    beforeEach(() => {
+      mockMetricsService = {
+        databaseQueryMetrics: {
+          startTimer: jest.fn().mockReturnValue(() => {}),
+        },
+      };
+      (service as any).metricsService = mockMetricsService;
+    });
+
+    it('should record failure metrics on query error', async () => {
+      const error = new Error('Query failed');
+      mockPool.query.mockRejectedValue(error);
+
+      const successTimer = jest.fn();
+      const failureTimer = jest.fn();
+      mockMetricsService.databaseQueryMetrics.startTimer
+        .mockReturnValueOnce(successTimer)
+        .mockReturnValueOnce(failureTimer);
+
+      await expect(service.query('SELECT * FROM test')).rejects.toThrow('Query failed');
+
+      expect(mockMetricsService.databaseQueryMetrics.startTimer).toHaveBeenCalledWith({
+        operation: 'select',
+        status: 'success',
+      });
+      expect(successTimer).toHaveBeenCalled();
+      expect(mockMetricsService.databaseQueryMetrics.startTimer).toHaveBeenCalledWith({
+        operation: 'select',
+        status: 'failure',
+      });
+      expect(failureTimer).toHaveBeenCalled();
+    });
+
+    it('should handle query without metrics service', async () => {
+      (service as any).metricsService = undefined;
+      const error = new Error('Query failed');
+      mockPool.query.mockRejectedValue(error);
+
+      await expect(service.query('SELECT * FROM test')).rejects.toThrow('Query failed');
+    });
+  });
+
+  describe('extractOperation', () => {
+    it('should extract SELECT operation', async () => {
+      const mockResult = { rows: [], rowCount: 0 };
+      mockPool.query.mockResolvedValue(mockResult as any);
+      const mockMetricsService = {
+        databaseQueryMetrics: {
+          startTimer: jest.fn().mockReturnValue(() => {}),
+        },
+      };
+      (service as any).metricsService = mockMetricsService;
+
+      await service.query('SELECT * FROM test');
+
+      expect(mockMetricsService.databaseQueryMetrics.startTimer).toHaveBeenCalledWith({
+        operation: 'select',
+        status: 'success',
+      });
+    });
+
+    it('should extract INSERT operation', async () => {
+      const mockResult = { rows: [], rowCount: 0 };
+      mockPool.query.mockResolvedValue(mockResult as any);
+      const mockMetricsService = {
+        databaseQueryMetrics: {
+          startTimer: jest.fn().mockReturnValue(() => {}),
+        },
+      };
+      (service as any).metricsService = mockMetricsService;
+
+      await service.query('INSERT INTO test VALUES (1)');
+
+      expect(mockMetricsService.databaseQueryMetrics.startTimer).toHaveBeenCalledWith({
+        operation: 'insert',
+        status: 'success',
+      });
+    });
+
+    it('should extract UPDATE operation', async () => {
+      const mockResult = { rows: [], rowCount: 0 };
+      mockPool.query.mockResolvedValue(mockResult as any);
+      const mockMetricsService = {
+        databaseQueryMetrics: {
+          startTimer: jest.fn().mockReturnValue(() => {}),
+        },
+      };
+      (service as any).metricsService = mockMetricsService;
+
+      await service.query('UPDATE test SET name = $1 WHERE id = $2');
+
+      expect(mockMetricsService.databaseQueryMetrics.startTimer).toHaveBeenCalledWith({
+        operation: 'update',
+        status: 'success',
+      });
+    });
+
+    it('should extract DELETE operation', async () => {
+      const mockResult = { rows: [], rowCount: 0 };
+      mockPool.query.mockResolvedValue(mockResult as any);
+      const mockMetricsService = {
+        databaseQueryMetrics: {
+          startTimer: jest.fn().mockReturnValue(() => {}),
+        },
+      };
+      (service as any).metricsService = mockMetricsService;
+
+      await service.query('DELETE FROM test WHERE id = $1');
+
+      expect(mockMetricsService.databaseQueryMetrics.startTimer).toHaveBeenCalledWith({
+        operation: 'delete',
+        status: 'success',
+      });
+    });
+
+    it('should extract PROCEDURE operation', async () => {
+      const mockResult = { rows: [], rowCount: 0 };
+      mockPool.query.mockResolvedValue(mockResult as any);
+      const mockMetricsService = {
+        databaseQueryMetrics: {
+          startTimer: jest.fn().mockReturnValue(() => {}),
+        },
+      };
+      (service as any).metricsService = mockMetricsService;
+
+      await service.query('CALL test_procedure($1)');
+
+      expect(mockMetricsService.databaseQueryMetrics.startTimer).toHaveBeenCalledWith({
+        operation: 'procedure',
+        status: 'success',
+      });
+    });
+
+    it('should extract other operation for unknown queries', async () => {
+      const mockResult = { rows: [], rowCount: 0 };
+      mockPool.query.mockResolvedValue(mockResult as any);
+      const mockMetricsService = {
+        databaseQueryMetrics: {
+          startTimer: jest.fn().mockReturnValue(() => {}),
+        },
+      };
+      (service as any).metricsService = mockMetricsService;
+
+      await service.query('ALTER TABLE test ADD COLUMN name VARCHAR');
+
+      expect(mockMetricsService.databaseQueryMetrics.startTimer).toHaveBeenCalledWith({
+        operation: 'other',
+        status: 'success',
+      });
+    });
+  });
+
+  describe('transaction rollback error handling', () => {
+    it('should handle rollback error gracefully', async () => {
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      } as any;
+
+      mockPool.connect.mockResolvedValue(mockClient);
+      mockClient.query
+        .mockResolvedValueOnce({}) // BEGIN
+        .mockRejectedValueOnce(new Error('Transaction failed')); // Error in callback
+
+      const callback = jest.fn().mockRejectedValue(new Error('Transaction failed'));
+      mockClient.query.mockRejectedValueOnce(new Error('Rollback failed')); // Rollback also fails
+
+      await expect(service.transaction(callback)).rejects.toThrow('Transaction failed');
+
+      expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClient.release).toHaveBeenCalled(); // Should still release client
+    });
+  });
 });

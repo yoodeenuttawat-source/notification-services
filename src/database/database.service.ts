@@ -1,12 +1,13 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Optional } from '@nestjs/common';
 import { Pool, PoolClient } from 'pg';
 import { getDatabaseConfig } from '../config/database.config';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private pool: Pool;
 
-  constructor() {
+  constructor(@Optional() private readonly metricsService?: MetricsService) {
     const config = getDatabaseConfig();
     this.pool = new Pool(config);
   }
@@ -37,11 +38,37 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
    * Execute a query
    */
   async query<T = any>(text: string, params?: any[]): Promise<{ rows: T[]; rowCount: number }> {
-    const result = await this.pool.query(text, params);
-    return {
-      rows: result.rows,
-      rowCount: result.rowCount || 0,
-    };
+    const operation = this.extractOperation(text);
+    const timer = this.metricsService?.databaseQueryMetrics.startTimer({ operation, status: 'success' });
+    
+    try {
+      const result = await this.pool.query(text, params);
+      
+      timer?.();
+      
+      return {
+        rows: result.rows,
+        rowCount: result.rowCount || 0,
+      };
+    } catch (error) {
+      timer?.(); // Stop success timer
+      const errorTimer = this.metricsService?.databaseQueryMetrics.startTimer({ operation, status: 'failure' });
+      errorTimer?.();
+      throw error;
+    }
+  }
+  
+  /**
+   * Extract operation type from SQL query
+   */
+  private extractOperation(text: string): string {
+    const trimmed = text.trim().toUpperCase();
+    if (trimmed.startsWith('SELECT')) return 'select';
+    if (trimmed.startsWith('INSERT')) return 'insert';
+    if (trimmed.startsWith('UPDATE')) return 'update';
+    if (trimmed.startsWith('DELETE')) return 'delete';
+    if (trimmed.startsWith('CALL') || trimmed.includes('PROCEDURE')) return 'procedure';
+    return 'other';
   }
 
   /**

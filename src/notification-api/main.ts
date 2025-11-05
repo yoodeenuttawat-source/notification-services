@@ -17,6 +17,7 @@ async function bootstrap() {
   const port = process.env.API_PORT || 3000;
   await app.listen(port);
   console.log(`Notification API is running on: http://localhost:${port}`);
+  console.log(`Metrics endpoint available at: http://localhost:${port}/metrics`);
 }
 
 bootstrap();

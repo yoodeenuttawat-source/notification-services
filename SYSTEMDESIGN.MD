@@ -44,7 +44,12 @@ This document describes the system design for the Notification Services applicat
      - **Non-retryable errors** (e.g., invalid data, missing required fields): Published to DLQ with metadata indicating no retry, and delivery log is updated with failure status
    - Each worker publishes delivery logs with error details for tracking
 
-6. **Kafka Connector**:
+6. **Kafka Message Failure Handling**:
+   - If any Kafka message fails to send, it will be written to disk
+   - A separate process reads from disk and resends to Kafka
+   - This mechanism works when running on dedicated nodes/servers
+
+7. **Kafka Connector**:
    - Subscribes to all topics to build tables from events
    - Provides event sourcing and data persistence
 
@@ -53,7 +58,7 @@ This document describes the system design for the Notification Services applicat
 1. **Scalability & Reliability**:
    - System needs to handle **100k notifications per minute** (1667 notifications per second)
    - Focus on reliability
-   - Two options considered: Outbox pattern vs Event Sourcing
+   - Event sourcing can achieve this in one transaction
    - **Decision: Event Sourcing** - Chosen because the bottleneck will be Kafka, which supports high throughput. Outbox pattern has limitations on database.
 
 2. **Provider Idempotency**:
@@ -94,33 +99,56 @@ This document describes the system design for the Notification Services applicat
 
 ### Prometheus Metrics
 
-1. **Provider API Metrics**:
-   - Success rate
-   - Latency
+All metrics are exposed via the `/metrics` endpoint on the Notification API (default: `http://localhost:3000/metrics`).
 
-2. **Circuit Breaker Metrics**:
-   - Circuit breaker status
+1. **Notification API Metrics** (`notification_api_request_duration_seconds`):
+   - Request duration (histogram with buckets)
+   - Request count (derived from histogram)
+   - Request per minute (derived from histogram)
+   - Labels: `method`, `url`, `httpStatus`
+   - **Alert thresholds**: P95 latency exceeds threshold, success rate drops below 99%
 
-3. **Notification API Metrics**:
-   - Requests per minute
-   - Latency
-   - Success rate
+2. **Worker Processing Metrics** (`worker_processing_duration_seconds`):
+   - Processing duration (histogram with buckets)
+   - Processing count (derived from histogram)
+   - Success rate (derived from histogram)
+   - Labels: `worker`, `topic`, `status`
+   - **Alert thresholds**: P95 latency exceeds threshold, success rate drops below 99%
 
-4. **Kafka Metrics**:
-   - Success rate per topic
-   - Response time per topic
+3. **Provider API Metrics** (`provider_api_duration_seconds`):
+   - API call duration (histogram with buckets)
+   - API call count (derived from histogram)
+   - Success rate (derived from histogram)
+   - Labels: `provider`, `channel`, `status`
+   - **Alert thresholds**: P95 latency exceeds threshold, success rate drops below 99%
 
-5. **Database Metrics**:
-   - Latency
-   - Success rate
+4. **Circuit Breaker Metrics** (`circuit_breaker_state`):
+   - Circuit breaker state (gauge: 0=CLOSED, 1=OPEN, 2=HALF_OPEN)
+   - Labels: `provider`
+   - **Alert thresholds**: Alert when circuit breaker is OPEN
 
-6. **DLQ Metrics**:
-   - DLQ message count
-   - Processing rate
+5. **Kafka Metrics**:
+   - **Publish Metrics** (`kafka_publish_duration_seconds`): Duration and count for publish operations
+     - Success rate per topic (derived from histogram)
+     - Response time per topic (histogram)
+     - Labels: `topic`, `status`
+     - **Alert thresholds**: Success rate drops below 100%, P95 response time exceeds threshold
+   - **Consume Metrics** (`kafka_consume_duration_seconds`): Duration and count for consume operations
+     - Labels: `topic`, `consumer_group`
 
-7. **Worker Metrics**:
-   - Processing time
-   - Success rate
+6. **Database Metrics** (`database_query_duration_seconds`):
+   - Query duration (histogram with buckets)
+   - Query count (derived from histogram)
+   - Success rate (derived from histogram)
+   - Labels: `operation`, `status`
+   - **Alert thresholds**: P95 latency exceeds threshold, success rate drops below 100%
+
+7. **DLQ Metrics** (`dlq_replay_total`):
+   - Total number of DLQ messages replayed (counter)
+   - DLQ message count (derived from counter)
+   - Processing rate (derived from counter)
+   - Labels: `topic`, `status`
+   - **Alert thresholds**: DLQ message count exceeds threshold
 
 ### Infrastructure Metrics
 
@@ -149,7 +177,7 @@ This document describes the system design for the Notification Services applicat
 ### Unit Test Coverage
 
 - **Line Coverage**: 90%
-- **Branch Coverage**: 89.5%
+- **Branch Coverage**: 90%
 
 **Command:**
 ```bash
@@ -189,6 +217,7 @@ yarn test:load
 - **LRU Cache**: In-memory caching with concurrent access support for:
   - Configuration data (templates, events, channels, providers) - refreshed periodically
   - Message deduplication (TTL: 2 minutes per notification)
+- **Prometheus**: Metrics collection and monitoring via `prom-client` library
 
 ### Data Flow Diagram
 
@@ -215,4 +244,8 @@ Kafka Connector (Event Sourcing)
     ↓
 PostgreSQL Database Tables
 ```
+
+## Configuration
+
+Configuration is stored in the `migrations/` folder. Database migrations contain the initial configuration for templates, events, channels, and providers.
 

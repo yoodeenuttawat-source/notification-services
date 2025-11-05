@@ -5,6 +5,7 @@ import { KafkaService } from '../kafka/kafka.service';
 import { KAFKA_TOPICS } from '../kafka/kafka.config';
 import { ProviderRequestResponse } from '../kafka/types/provider-request-response';
 import { DeliveryLog } from '../kafka/types/delivery-log';
+import { MetricsService } from '../metrics/metrics.service';
 
 export interface NotificationContext {
   notification_id: string;
@@ -32,12 +33,16 @@ export interface NotificationResult {
 export abstract class BaseProviderService {
   protected abstract readonly providerName: string;
   protected abstract readonly channelType: 'push' | 'email';
+  private readonly metricsService: MetricsService;
 
   constructor(
     protected circuitBreakerService: CircuitBreakerService,
-    protected kafkaService?: KafkaService,
-    protected circuitBreakerConfig?: Partial<CircuitBreakerConfig>
-  ) {}
+    protected kafkaService: KafkaService,
+    protected circuitBreakerConfig: Partial<CircuitBreakerConfig>,
+    metricsService: MetricsService
+  ) {
+    this.metricsService = metricsService;
+  }
 
   /**
    * Public method that checks circuit breaker before calling actual implementation
@@ -58,6 +63,12 @@ export abstract class BaseProviderService {
     const request = this.getRequest(payload);
     const headers = this.getHeaders(payload);
 
+    const timer = this.metricsService.providerApiMetrics.startTimer({
+      provider: this.providerName,
+      channel: this.channelType,
+      status: 'success',
+    });
+
     try {
       // Call the actual provider implementation
       const result = await this.executeSend(payload);
@@ -66,8 +77,11 @@ export abstract class BaseProviderService {
       // Record success
       this.circuitBreakerService.recordSuccess(this.providerName, this.circuitBreakerConfig);
 
-      // Publish provider request/response if KafkaService is available and context is provided
-      if (this.kafkaService && payload.context) {
+      // Record metrics
+      timer();
+
+      // Publish provider request/response if context is provided
+      if (payload.context) {
         await this.publishProviderResponse({
           provider_request_id: providerRequestId,
           notification_id: payload.context.notification_id,
@@ -112,8 +126,17 @@ export abstract class BaseProviderService {
       // Record failure
       this.circuitBreakerService.recordFailure(this.providerName, this.circuitBreakerConfig);
 
-      // Publish provider request/response with error if KafkaService is available and context is provided
-      if (this.kafkaService && payload.context) {
+      // Record metrics - stop success timer and record failure
+      timer(); // Stop success timer
+      const errorTimer = this.metricsService.providerApiMetrics.startTimer({
+        provider: this.providerName,
+        channel: this.channelType,
+        status: 'failure',
+      });
+      errorTimer();
+
+      // Publish provider request/response with error if context is provided
+      if (payload.context) {
         await this.publishProviderResponse({
           provider_request_id: providerRequestId,
           notification_id: payload.context.notification_id,
@@ -147,10 +170,6 @@ export abstract class BaseProviderService {
   private async publishProviderResponse(
     response: Omit<ProviderRequestResponse, 'timestamp'>
   ): Promise<void> {
-    if (!this.kafkaService) {
-      return; // Skip if KafkaService is not available
-    }
-
     const providerResponse: ProviderRequestResponse = {
       ...response,
       timestamp: new Date().toISOString(),
@@ -168,10 +187,6 @@ export abstract class BaseProviderService {
    * Publish delivery log to Kafka
    */
   private async publishDeliveryLog(log: Omit<DeliveryLog, 'timestamp'>): Promise<void> {
-    if (!this.kafkaService) {
-      return; // Skip if KafkaService is not available
-    }
-
     const deliveryLog: DeliveryLog = {
       ...log,
       timestamp: new Date().toISOString(),

@@ -40,6 +40,18 @@ describe('DefaultCircuitBreakerStrategy', () => {
       expect(strategy.shouldAllowRequest(metrics, defaultConfig)).toBe(false);
     });
 
+    it('should not allow request when OPEN and lastFailureTime is null', () => {
+      const metrics: CircuitBreakerMetrics = {
+        failureCount: 5,
+        successCount: 0,
+        lastFailureTime: null, // No failure time
+        state: CircuitBreakerState.OPEN,
+        lastStateChangeTime: Date.now() - 1000,
+      };
+
+      expect(strategy.shouldAllowRequest(metrics, defaultConfig)).toBe(false);
+    });
+
     it('should allow request when OPEN and timeout passed', () => {
       const metrics: CircuitBreakerMetrics = {
         failureCount: 5,
@@ -197,6 +209,47 @@ describe('DefaultCircuitBreakerStrategy', () => {
 
       const newState = strategy.recordSuccess(metrics, defaultConfig);
       expect(newState).toBe(CircuitBreakerState.HALF_OPEN);
+    });
+  });
+
+  describe('default cases', () => {
+    it('should handle unknown state in shouldAllowRequest', () => {
+      const metrics: CircuitBreakerMetrics = {
+        failureCount: 0,
+        successCount: 0,
+        lastFailureTime: null,
+        state: 999 as any, // Invalid state
+        lastStateChangeTime: Date.now(),
+      };
+
+      const result = strategy.shouldAllowRequest(metrics, defaultConfig);
+      expect(result).toBe(false);
+    });
+
+    it('should handle unknown state in recordSuccess', () => {
+      const metrics: CircuitBreakerMetrics = {
+        failureCount: 0,
+        successCount: 0,
+        lastFailureTime: null,
+        state: 999 as any, // Invalid state
+        lastStateChangeTime: Date.now(),
+      };
+
+      const newState = strategy.recordSuccess(metrics, defaultConfig);
+      expect(newState).toBe(999); // Should return current state
+    });
+
+    it('should handle unknown state in recordFailure', () => {
+      const metrics: CircuitBreakerMetrics = {
+        failureCount: 0,
+        successCount: 0,
+        lastFailureTime: null,
+        state: 999 as any, // Invalid state
+        lastStateChangeTime: Date.now(),
+      };
+
+      const newState = strategy.recordFailure(metrics, defaultConfig);
+      expect(newState).toBe(999); // Should return current state
     });
   });
 });

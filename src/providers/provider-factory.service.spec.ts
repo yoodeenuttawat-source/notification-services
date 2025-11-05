@@ -2,12 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProviderFactoryService } from './provider-factory.service';
 import { CircuitBreakerService } from '../circuit-breaker/CircuitBreakerService';
 import { KafkaService } from '../kafka/kafka.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { BaseProviderService } from './base-provider.service';
 
 describe('ProviderFactoryService', () => {
   let service: ProviderFactoryService;
   let circuitBreakerService: CircuitBreakerService;
   let kafkaService: KafkaService;
+  let metricsService: MetricsService;
 
   beforeEach(async () => {
     const mockCircuitBreakerService = {
@@ -21,6 +23,12 @@ describe('ProviderFactoryService', () => {
       publishMessage: jest.fn(),
     };
 
+    const mockMetricsService = {
+      providerApiMetrics: {
+        startTimer: jest.fn().mockReturnValue(() => 0.1),
+      },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProviderFactoryService,
@@ -32,12 +40,17 @@ describe('ProviderFactoryService', () => {
           provide: KafkaService,
           useValue: mockKafkaService,
         },
+        {
+          provide: MetricsService,
+          useValue: mockMetricsService,
+        },
       ],
     }).compile();
 
     service = module.get<ProviderFactoryService>(ProviderFactoryService);
     circuitBreakerService = module.get<CircuitBreakerService>(CircuitBreakerService);
     kafkaService = module.get<KafkaService>(KafkaService);
+    metricsService = module.get<MetricsService>(MetricsService);
   });
 
   describe('getProvider', () => {
