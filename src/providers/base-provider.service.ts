@@ -66,7 +66,6 @@ export abstract class BaseProviderService {
     const timer = this.metricsService.providerApiMetrics.startTimer({
       provider: this.providerName,
       channel: this.channelType,
-      status: 'success',
     });
 
     try {
@@ -78,7 +77,7 @@ export abstract class BaseProviderService {
       this.circuitBreakerService.recordSuccess(this.providerName, this.circuitBreakerConfig);
 
       // Record metrics
-      timer();
+      timer({ status: 'success' });
 
       // Publish provider request/response if context is provided
       if (payload.context) {
@@ -126,14 +125,8 @@ export abstract class BaseProviderService {
       // Record failure
       this.circuitBreakerService.recordFailure(this.providerName, this.circuitBreakerConfig);
 
-      // Record metrics - stop success timer and record failure
-      timer(); // Stop success timer
-      const errorTimer = this.metricsService.providerApiMetrics.startTimer({
-        provider: this.providerName,
-        channel: this.channelType,
-        status: 'failure',
-      });
-      errorTimer();
+      // Record metrics
+      timer({ status: 'failed' });
 
       // Publish provider request/response with error if context is provided
       if (payload.context) {

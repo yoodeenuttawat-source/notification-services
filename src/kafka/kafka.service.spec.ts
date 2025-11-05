@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { KafkaService } from './kafka.service';
 import { Kafka, Producer, Consumer } from 'kafkajs';
 import { getKafkaConfig } from './kafka.config';
+import { MetricsService } from '../metrics/metrics.service';
 
 // Mock kafkajs
 jest.mock('kafkajs');
@@ -12,6 +13,7 @@ describe('KafkaService', () => {
   let mockProducer: jest.Mocked<Producer>;
   let mockConsumer: jest.Mocked<Consumer>;
   let mockKafka: jest.Mocked<Kafka>;
+  let mockMetricsService: jest.Mocked<MetricsService>;
 
   beforeEach(async () => {
     // Reset mocks
@@ -38,6 +40,18 @@ describe('KafkaService', () => {
       consumer: jest.fn().mockReturnValue(mockConsumer),
     } as any;
 
+    // Mock MetricsService
+    const mockPublishTimer = jest.fn();
+    const mockConsumeTimer = jest.fn();
+    mockMetricsService = {
+      kafkaPublishMetrics: {
+        startTimer: jest.fn().mockReturnValue(mockPublishTimer) as jest.Mock,
+      },
+      kafkaConsumeMetrics: {
+        startTimer: jest.fn().mockReturnValue(mockConsumeTimer) as jest.Mock,
+      },
+    } as any;
+
     (Kafka as jest.MockedClass<typeof Kafka>).mockImplementation(() => mockKafka);
     (getKafkaConfig as jest.Mock).mockReturnValue({
       brokers: ['localhost:29092'],
@@ -45,7 +59,13 @@ describe('KafkaService', () => {
     });
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [KafkaService],
+      providers: [
+        KafkaService,
+        {
+          provide: MetricsService,
+          useValue: mockMetricsService,
+        },
+      ],
     }).compile();
 
     service = module.get<KafkaService>(KafkaService);
@@ -76,8 +96,12 @@ describe('KafkaService', () => {
   });
 
   describe('publishMessage', () => {
+    let mockTimer: jest.Mock;
+
     beforeEach(async () => {
       await service.onModuleInit();
+      mockTimer = jest.fn();
+      (mockMetricsService.kafkaPublishMetrics.startTimer as jest.Mock).mockReturnValue(mockTimer);
     });
 
     it('should publish message successfully', async () => {
@@ -85,6 +109,9 @@ describe('KafkaService', () => {
 
       await service.publishMessage('test-topic', messages);
 
+      expect(mockMetricsService.kafkaPublishMetrics.startTimer).toHaveBeenCalledWith({
+        topic: 'test-topic',
+      });
       expect(mockProducer.send).toHaveBeenCalledWith({
         topic: 'test-topic',
         messages: [
@@ -94,6 +121,7 @@ describe('KafkaService', () => {
           },
         ],
       });
+      expect(mockTimer).toHaveBeenCalledWith({ status: 'success' });
     });
 
     it('should publish multiple messages', async () => {
@@ -138,6 +166,7 @@ describe('KafkaService', () => {
       await expect(service.publishMessage('test-topic', messages)).rejects.toThrow(
         'Publish failed'
       );
+      expect(mockTimer).toHaveBeenCalledWith({ status: 'failed' });
     });
   });
 
@@ -197,11 +226,7 @@ describe('KafkaService', () => {
       expect(handler).toHaveBeenCalledWith(mockPayload);
     });
 
-    it('should handle consumeMessages when metricsService timer is undefined', async () => {
-      // Create a service without metricsService to test timer?.() branch
-      const serviceWithoutMetrics = new KafkaService();
-      (serviceWithoutMetrics as any).metricsService = undefined;
-
+    it('should record metrics when consuming messages', async () => {
       const handler = jest.fn().mockResolvedValue(undefined);
       const mockPayload = {
         topic: 'test-topic',
@@ -209,13 +234,19 @@ describe('KafkaService', () => {
         message: { key: Buffer.from('key'), value: Buffer.from('value') },
       } as any;
 
-      await serviceWithoutMetrics.consumeMessages(mockConsumer, handler, 'test-topic', 'test-group');
+      const mockTimer = jest.fn();
+      (mockMetricsService.kafkaConsumeMetrics.startTimer as jest.Mock).mockReturnValue(mockTimer);
+
+      await service.consumeMessages(mockConsumer, handler, 'test-topic', 'test-group');
 
       const runCall = mockConsumer.run.mock.calls[0][0];
-
-      // Execute the handler - timer should be undefined, so timer?.() should not throw
       await runCall.eachMessage(mockPayload);
 
+      expect(mockMetricsService.kafkaConsumeMetrics.startTimer).toHaveBeenCalledWith({
+        topic: 'test-topic',
+        consumer_group: 'test-group',
+      });
+      expect(mockTimer).toHaveBeenCalled();
       expect(handler).toHaveBeenCalledWith(mockPayload);
     });
   });

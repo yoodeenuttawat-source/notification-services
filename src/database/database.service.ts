@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Optional } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Pool, PoolClient } from 'pg';
 import { getDatabaseConfig } from '../config/database.config';
 import { MetricsService } from '../metrics/metrics.service';
@@ -7,7 +7,7 @@ import { MetricsService } from '../metrics/metrics.service';
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private pool: Pool;
 
-  constructor(@Optional() private readonly metricsService?: MetricsService) {
+  constructor(private readonly metricsService: MetricsService) {
     const config = getDatabaseConfig();
     this.pool = new Pool(config);
   }
@@ -39,21 +39,19 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
    */
   async query<T = any>(text: string, params?: any[]): Promise<{ rows: T[]; rowCount: number }> {
     const operation = this.extractOperation(text);
-    const timer = this.metricsService?.databaseQueryMetrics.startTimer({ operation, status: 'success' });
+    const timer = this.metricsService.databaseQueryMetrics.startTimer({ operation });
     
     try {
       const result = await this.pool.query(text, params);
       
-      timer?.();
+      timer({ status: 'success' });
       
       return {
         rows: result.rows,
         rowCount: result.rowCount || 0,
       };
     } catch (error) {
-      timer?.(); // Stop success timer
-      const errorTimer = this.metricsService?.databaseQueryMetrics.startTimer({ operation, status: 'failure' });
-      errorTimer?.();
+      timer({ status: 'failed' });
       throw error;
     }
   }
