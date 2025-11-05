@@ -3,12 +3,14 @@ import { PushProviderService1 } from './push-provider1.service';
 import { CircuitBreakerService } from '../../circuit-breaker/CircuitBreakerService';
 import { CircuitBreakerOpenError } from '../../circuit-breaker/CircuitBreakerOpenError';
 import { KafkaService } from '../../kafka/kafka.service';
+import { MetricsService } from '../../metrics/metrics.service';
 import { KAFKA_TOPICS } from '../../kafka/kafka.config';
 
 describe('PushProviderService1', () => {
   let service: PushProviderService1;
   let circuitBreakerService: CircuitBreakerService;
   let kafkaService: KafkaService;
+  let metricsService: MetricsService;
 
   const mockCircuitBreakerService = {
     shouldAllowRequest: jest.fn().mockReturnValue(true),
@@ -19,6 +21,12 @@ describe('PushProviderService1', () => {
 
   const mockKafkaService = {
     publishMessage: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockMetricsService = {
+    providerApiMetrics: {
+      startTimer: jest.fn().mockReturnValue(() => 0.1),
+    },
   };
 
   beforeEach(async () => {
@@ -39,11 +47,19 @@ describe('PushProviderService1', () => {
           useValue: mockKafkaService,
         },
         {
+          provide: MetricsService,
+          useValue: mockMetricsService,
+        },
+        {
           provide: PushProviderService1,
-          useFactory: (circuitBreaker: CircuitBreakerService, kafka?: KafkaService) => {
-            return new PushProviderService1(circuitBreaker, kafka);
+          useFactory: (
+            circuitBreaker: CircuitBreakerService,
+            kafka: KafkaService,
+            metrics: MetricsService
+          ) => {
+            return new PushProviderService1(circuitBreaker, kafka, {}, metrics);
           },
-          inject: [CircuitBreakerService, KafkaService],
+          inject: [CircuitBreakerService, KafkaService, MetricsService],
         },
       ],
     }).compile();
@@ -51,6 +67,7 @@ describe('PushProviderService1', () => {
     service = module.get<PushProviderService1>(PushProviderService1);
     circuitBreakerService = module.get<CircuitBreakerService>(CircuitBreakerService);
     kafkaService = module.get<KafkaService>(KafkaService);
+    metricsService = module.get<MetricsService>(MetricsService);
 
     jest.clearAllMocks();
   });
@@ -92,6 +109,7 @@ describe('PushProviderService1', () => {
       await expect(service.sendNotification(payload)).rejects.toThrow(CircuitBreakerOpenError);
       expect(circuitBreakerService.recordSuccess).not.toHaveBeenCalled();
     });
+
 
     it('should publish provider response on success', async () => {
       const payload = {
@@ -153,6 +171,22 @@ describe('PushProviderService1', () => {
           }),
         ])
       );
+    });
+
+    it('should not publish provider response when context is missing', async () => {
+      const payload = {
+        recipient: 'user123',
+        content: 'Test Content',
+      };
+
+      await service.sendNotification(payload);
+
+      // Should not publish provider response when context is missing
+      const publishCalls = mockKafkaService.publishMessage.mock.calls;
+      const providerResponseCalls = publishCalls.filter(
+        (call) => call[0] === KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE
+      );
+      expect(providerResponseCalls.length).toBe(0);
     });
   });
 
@@ -216,6 +250,75 @@ describe('PushProviderService1', () => {
       const request = service['getRequest'](payload);
       expect(request.idempotentKey).toBe('custom-id');
     });
+
+    it('should use "unknown" as idempotentKey when context is missing', () => {
+      const payload = {
+        recipient: 'user123',
+        content: 'Content',
+      };
+
+      const request = service['getRequest'](payload);
+      expect(request.idempotentKey).toBe('unknown');
+    });
+
+    it('should use "unknown" as idempotentKey when notification_id is missing', () => {
+      const payload = {
+        recipient: 'user123',
+        content: 'Content',
+        context: {
+          event_id: 1,
+          event_name: 'TEST',
+          channel_id: 1,
+          channel_name: 'PUSH',
+        },
+      } as any;
+
+      const request = service['getRequest'](payload);
+      expect(request.idempotentKey).toBe('unknown');
+    });
+  });
+
+  describe('executeSend', () => {
+    it('should use "unknown" as idempotentKey when context is missing', async () => {
+      const payload = {
+        recipient: 'user123',
+        content: 'Test Content',
+      };
+
+      const loggerSpy = jest.spyOn(service['logger'], 'log');
+      await service.sendNotification(payload);
+
+      expect(loggerSpy).toHaveBeenCalled();
+      const logCall = loggerSpy.mock.calls[0][0];
+      const logData = JSON.parse(logCall);
+      expect(logData.idempotentKey).toBe('unknown');
+    });
+  });
+
+  describe('error handling', () => {
+    it('should handle errors when context is missing', async () => {
+      // Mock executeSend to throw an error
+      const originalExecuteSend = service['executeSend'];
+      service['executeSend'] = jest.fn().mockRejectedValue(new Error('Send failed'));
+
+      const payload = {
+        recipient: 'user123',
+        content: 'Test Content',
+      };
+
+      await expect(service.sendNotification(payload)).rejects.toThrow('Send failed');
+      expect(circuitBreakerService.recordFailure).toHaveBeenCalled();
+
+      // Should not publish provider response when context is missing
+      const publishCalls = mockKafkaService.publishMessage.mock.calls;
+      const providerResponseCalls = publishCalls.filter(
+        (call) => call[0] === KAFKA_TOPICS.PROVIDER_REQUEST_RESPONSE
+      );
+      expect(providerResponseCalls.length).toBe(0);
+
+      // Restore original method
+      service['executeSend'] = originalExecuteSend;
+    });
   });
 
   describe('getHeaders', () => {
@@ -242,12 +345,40 @@ describe('PushProviderService1', () => {
         'X-Provider-Version': '1.0',
       });
     });
+
+    it('should use "unknown" as idempotentKey when context is missing', () => {
+      const payload = {
+        recipient: 'user123',
+        content: 'Content',
+      };
+
+      const headers = service['getHeaders'](payload);
+      expect(headers['X-Idempotent-Key']).toBe('unknown');
+    });
   });
 
   describe('getUrl', () => {
     it('should return default URL', () => {
+      delete process.env.PUSH_PROVIDER1_API_URL;
+      delete process.env.PROVIDER_API_URL;
       const url = service['getUrl']();
       expect(url).toBe('https://api.push-provider1.com/v1/push');
+    });
+
+    it('should return PUSH_PROVIDER1_API_URL when set', () => {
+      process.env.PUSH_PROVIDER1_API_URL = 'https://custom-push-provider1.com/api';
+      delete process.env.PROVIDER_API_URL;
+      const url = service['getUrl']();
+      expect(url).toBe('https://custom-push-provider1.com/api');
+      delete process.env.PUSH_PROVIDER1_API_URL;
+    });
+
+    it('should return PROVIDER_API_URL when PUSH_PROVIDER1_API_URL is not set', () => {
+      delete process.env.PUSH_PROVIDER1_API_URL;
+      process.env.PROVIDER_API_URL = 'https://generic-provider.com/api';
+      const url = service['getUrl']();
+      expect(url).toBe('https://generic-provider.com/api');
+      delete process.env.PROVIDER_API_URL;
     });
   });
 
@@ -272,26 +403,4 @@ describe('PushProviderService1', () => {
     });
   });
 
-  describe('without KafkaService', () => {
-    it('should not publish when kafkaService is not available', async () => {
-      const serviceWithoutKafka = new PushProviderService1(circuitBreakerService);
-
-      const payload = {
-        recipient: 'user123',
-        content: 'Test Content',
-        context: {
-          notification_id: 'test-123',
-          event_id: 1,
-          event_name: 'TEST',
-          channel_id: 1,
-          channel_name: 'PUSH',
-        },
-      };
-
-      const result = await serviceWithoutKafka.sendNotification(payload);
-
-      expect(result.success).toBe(true);
-      expect(kafkaService.publishMessage).not.toHaveBeenCalled();
-    });
-  });
 });

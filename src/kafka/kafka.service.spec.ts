@@ -196,6 +196,28 @@ describe('KafkaService', () => {
 
       expect(handler).toHaveBeenCalledWith(mockPayload);
     });
+
+    it('should handle consumeMessages when metricsService timer is undefined', async () => {
+      // Create a service without metricsService to test timer?.() branch
+      const serviceWithoutMetrics = new KafkaService();
+      (serviceWithoutMetrics as any).metricsService = undefined;
+
+      const handler = jest.fn().mockResolvedValue(undefined);
+      const mockPayload = {
+        topic: 'test-topic',
+        partition: 0,
+        message: { key: Buffer.from('key'), value: Buffer.from('value') },
+      } as any;
+
+      await serviceWithoutMetrics.consumeMessages(mockConsumer, handler, 'test-topic', 'test-group');
+
+      const runCall = mockConsumer.run.mock.calls[0][0];
+
+      // Execute the handler - timer should be undefined, so timer?.() should not throw
+      await runCall.eachMessage(mockPayload);
+
+      expect(handler).toHaveBeenCalledWith(mockPayload);
+    });
   });
 
   describe('getProducer', () => {

@@ -296,4 +296,164 @@ describe('CacheService', () => {
       expect(stats.size).toBe(targetSize);
     });
   });
+
+  describe('error handling', () => {
+    it('should handle errors in get gracefully', async () => {
+      const service = new CacheService({ maxSize: 10000, cacheName: 'TestCache' });
+      await service.onModuleInit();
+      
+      // Mock cache.get to throw an error
+      const originalGet = service['cache'].get;
+      service['cache'].get = jest.fn().mockRejectedValue(new Error('Cache error'));
+      
+      const result = await service.get('test-key');
+      expect(result).toBeNull();
+      
+      // Restore original method
+      service['cache'].get = originalGet;
+    });
+
+    it('should handle errors in set gracefully', async () => {
+      const service = new CacheService({ maxSize: 10000, cacheName: 'TestCache' });
+      await service.onModuleInit();
+      
+      // Mock cache.put to throw an error
+      const originalPut = service['cache'].put;
+      service['cache'].put = jest.fn().mockRejectedValue(new Error('Cache error'));
+      
+      await service.set('test-key', 'value');
+      // Should not throw
+      
+      // Restore original method
+      service['cache'].put = originalPut;
+    });
+
+    it('should handle errors in delete gracefully', () => {
+      const service = new CacheService({ maxSize: 10000, cacheName: 'TestCache' });
+      
+      // Mock cache.invalidate to throw an error
+      const originalInvalidate = service['cache'].invalidate;
+      service['cache'].invalidate = jest.fn().mockImplementation(() => {
+        throw new Error('Cache error');
+      });
+      
+      expect(() => service.delete('test-key')).not.toThrow();
+      
+      // Restore original method
+      service['cache'].invalidate = originalInvalidate;
+    });
+
+    it('should handle errors in deletePattern gracefully', async () => {
+      const service = new CacheService({ maxSize: 10000, cacheName: 'TestCache' });
+      await service.onModuleInit();
+      
+      await service.set('test:key1', 'value1');
+      
+      // Mock cache.invalidate to throw an error
+      const originalInvalidate = service['cache'].invalidate;
+      service['cache'].invalidate = jest.fn().mockImplementation(() => {
+        throw new Error('Cache error');
+      });
+      
+      await service.deletePattern('test:*');
+      // Should not throw
+      
+      // Restore original method
+      service['cache'].invalidate = originalInvalidate;
+    });
+
+    it('should handle errors in getStats gracefully', () => {
+      const service = new CacheService({ maxSize: 10000, cacheName: 'TestCache' });
+      
+      // Mock cache.size to throw an error
+      const originalSize = service['cache'].size;
+      service['cache'].size = jest.fn().mockImplementation(() => {
+        throw new Error('Cache error');
+      });
+      
+      const stats = service.getStats();
+      expect(stats.size).toBe(0);
+      expect(stats.maxSize).toBe(10000);
+      
+      // Restore original method
+      service['cache'].size = originalSize;
+    });
+
+    it('should handle CACHE_MISS error in get', async () => {
+      const service = new CacheService({ maxSize: 10000, cacheName: 'TestCache' });
+      await service.onModuleInit();
+      
+      // Mock cache.has to return false, then get to throw CACHE_MISS
+      service['cache'].has = jest.fn().mockReturnValue(false);
+      service['cache'].get = jest.fn().mockRejectedValue(new Error('CACHE_MISS'));
+      
+      const result = await service.get('test-key');
+      expect(result).toBeNull();
+    });
+
+    it('should handle cleanupKeyIndex when key is removed from cache', async () => {
+      const service = new CacheService({ maxSize: 10000, cacheName: 'TestCache' });
+      await service.onModuleInit();
+      
+      await service.set('key1', 'value1');
+      await service.set('key2', 'value2');
+      
+      // Manually remove key1 from cache but keep it in keyIndex
+      service['cache'].invalidate('key1');
+      
+      // Trigger cleanup manually
+      service['cleanupKeyIndex']();
+      
+      const stats = service.getStats();
+      expect(stats.keys).not.toContain('key1');
+      expect(stats.keys).toContain('key2');
+    });
+
+    it('should handle get when cache.has returns false', async () => {
+      const service = new CacheService({ maxSize: 10000, cacheName: 'TestCache' });
+      await service.onModuleInit();
+      
+      // Mock cache.has to return false
+      service['cache'].has = jest.fn().mockReturnValue(false);
+      
+      const result = await service.get('test-key');
+      expect(result).toBeNull();
+    });
+
+    it('should handle get when cache.get throws CACHE_MISS', async () => {
+      const service = new CacheService({ maxSize: 10000, cacheName: 'TestCache' });
+      await service.onModuleInit();
+      
+      // Mock cache.has to return true, but get throws CACHE_MISS
+      service['cache'].has = jest.fn().mockReturnValue(true);
+      service['cache'].get = jest.fn().mockRejectedValue(new Error('CACHE_MISS'));
+      
+      const result = await service.get('test-key');
+      expect(result).toBeNull();
+    });
+
+    it('should handle get when value is null', async () => {
+      const service = new CacheService({ maxSize: 10000, cacheName: 'TestCache' });
+      await service.onModuleInit();
+      
+      // Mock cache.has to return true, get returns null
+      service['cache'].has = jest.fn().mockReturnValue(true);
+      service['cache'].get = jest.fn().mockResolvedValue(null);
+      
+      const result = await service.get('test-key');
+      expect(result).toBeNull();
+    });
+
+    it('should handle get when value is undefined', async () => {
+      const service = new CacheService({ maxSize: 10000, cacheName: 'TestCache' });
+      await service.onModuleInit();
+      
+      // Mock cache.has to return true, get returns undefined
+      service['cache'].has = jest.fn().mockReturnValue(true);
+      service['cache'].get = jest.fn().mockResolvedValue(undefined);
+      
+      const result = await service.get('test-key');
+      expect(result).toBeNull();
+    });
+  });
 });

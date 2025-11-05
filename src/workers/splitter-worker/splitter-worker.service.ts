@@ -5,15 +5,20 @@ import { NotificationMessage } from '../../kafka/types/notification-message';
 import { ChannelMessage } from '../../kafka/types/channel-message';
 import { BaseWorkerService } from '../base-worker.service';
 import { CacheService } from '../../cache/cache.service';
+import { MetricsService } from '../../metrics/metrics.service';
 import { EachMessagePayload } from 'kafkajs';
 
 @Injectable()
 export class SplitterWorkerService extends BaseWorkerService implements OnModuleInit {
+  private readonly workerName = 'splitter-worker';
+  private readonly topic = KAFKA_TOPICS.NOTIFICATION;
+
   constructor(
     protected readonly kafkaService: KafkaService,
-    protected readonly cacheService: CacheService
+    protected readonly cacheService: CacheService,
+    protected readonly metricsService: MetricsService
   ) {
-    super(kafkaService, cacheService, SplitterWorkerService.name);
+    super(kafkaService, cacheService, SplitterWorkerService.name, metricsService);
   }
 
   protected getDedupKeyPrefix(): string {
@@ -45,24 +50,45 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
     ]);
 
     this.logger.log('Starting to consume messages from notification topic...');
-    await this.kafkaService.consumeMessages(consumer, async (payload) => {
-      await this.processNotification(payload);
-    });
+    await this.kafkaService.consumeMessages(
+      consumer,
+      async (payload) => {
+        await this.processNotification(payload);
+      },
+      KAFKA_TOPICS.NOTIFICATION,
+      'splitter-worker-group'
+    );
 
     this.logger.log('Splitter worker started and ready to process messages');
   }
 
   private async processNotification(payload: EachMessagePayload) {
     const originalMessage = payload.message.value.toString();
+    const startTime = process.hrtime.bigint();
+    let status = 'success';
 
     try {
       // Parse and validate message
       const message = await this.parseMessage<NotificationMessage>(originalMessage);
-      if (!message) return;
+      if (!message) {
+        status = 'failure';
+        const duration = Number(process.hrtime.bigint() - startTime) / 1e9;
+        this.metricsService.workerProcessingMetrics.observe(
+          { worker: this.workerName, topic: this.topic, status },
+          duration
+        );
+        return;
+      }
 
       // Check for duplicate message
       if (await this.isDuplicate(message.notification_id)) {
         this.logger.warn(`Duplicate notification detected, skipping: ${message.notification_id}`);
+        status = 'success'; // Duplicate is considered successful (idempotent)
+        const duration = Number(process.hrtime.bigint() - startTime) / 1e9;
+        this.metricsService.workerProcessingMetrics.observe(
+          { worker: this.workerName, topic: this.topic, status },
+          duration
+        );
         return; // Skip processing duplicate message
       }
 
@@ -70,11 +96,33 @@ export class SplitterWorkerService extends BaseWorkerService implements OnModule
       await this.markAsProcessed(message.notification_id);
 
       // Validate message has templates
-      if (!(await this.validateMessage(message))) return;
+      if (!(await this.validateMessage(message))) {
+        status = 'failure';
+        const duration = Number(process.hrtime.bigint() - startTime) / 1e9;
+        this.metricsService.workerProcessingMetrics.observe(
+          { worker: this.workerName, topic: this.topic, status },
+          duration
+        );
+        return;
+      }
 
       // Route each rendered template to its channel topic concurrently
       await this.routeTemplates(message);
+
+      // Record success
+      status = 'success';
+      const duration = Number(process.hrtime.bigint() - startTime) / 1e9;
+      this.metricsService.workerProcessingMetrics.observe(
+        { worker: this.workerName, topic: this.topic, status },
+        duration
+      );
     } catch (error) {
+      status = 'failure';
+      const duration = Number(process.hrtime.bigint() - startTime) / 1e9;
+      this.metricsService.workerProcessingMetrics.observe(
+        { worker: this.workerName, topic: this.topic, status },
+        duration
+      );
       await this.handleProcessingError(
         originalMessage,
         payload.message.key?.toString(),

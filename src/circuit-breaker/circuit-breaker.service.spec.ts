@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CircuitBreakerService } from './CircuitBreakerService';
 import { CircuitBreakerState } from './CircuitBreakerState';
-import { CircuitBreakerConfig, CircuitBreakerStrategy } from './CircuitBreakerStrategy';
+import { CircuitBreakerConfig, CircuitBreakerStrategy, CircuitBreakerMetrics } from './CircuitBreakerStrategy';
 import { DefaultCircuitBreakerStrategy } from './DefaultCircuitBreakerStrategy';
 
 describe('CircuitBreakerService', () => {
@@ -146,6 +146,87 @@ describe('CircuitBreakerService', () => {
       expect(metrics.state).toBe(CircuitBreakerState.CLOSED);
 
       jest.useRealTimers();
+    });
+
+    it('should update Prometheus metrics for HALF_OPEN state', () => {
+      const mockMetricsService = {
+        circuitBreakerState: {
+          set: jest.fn(),
+        },
+      };
+
+      const serviceWithMetrics = new CircuitBreakerService(undefined, mockMetricsService as any);
+      
+      // Set state to HALF_OPEN
+      const metrics: CircuitBreakerMetrics = {
+        failureCount: 0,
+        successCount: 0,
+        lastFailureTime: null,
+        state: CircuitBreakerState.HALF_OPEN,
+        lastStateChangeTime: Date.now(),
+      };
+
+      // Manually update metrics to trigger Prometheus update
+      (serviceWithMetrics as any).updateMetrics('test-provider', metrics);
+
+      expect(mockMetricsService.circuitBreakerState.set).toHaveBeenCalledWith(
+        { provider: 'test-provider' },
+        2 // HALF_OPEN = 2
+      );
+    });
+
+    it('should update Prometheus metrics for OPEN state', () => {
+      const mockMetricsService = {
+        circuitBreakerState: {
+          set: jest.fn(),
+        },
+      };
+
+      const serviceWithMetrics = new CircuitBreakerService(undefined, mockMetricsService as any);
+      
+      // Set state to OPEN
+      const metrics: CircuitBreakerMetrics = {
+        failureCount: 5,
+        successCount: 0,
+        lastFailureTime: Date.now(),
+        state: CircuitBreakerState.OPEN,
+        lastStateChangeTime: Date.now(),
+      };
+
+      // Manually update metrics to trigger Prometheus update
+      (serviceWithMetrics as any).updateMetrics('test-provider', metrics);
+
+      expect(mockMetricsService.circuitBreakerState.set).toHaveBeenCalledWith(
+        { provider: 'test-provider' },
+        1 // OPEN = 1
+      );
+    });
+
+    it('should update Prometheus metrics for CLOSED state', () => {
+      const mockMetricsService = {
+        circuitBreakerState: {
+          set: jest.fn(),
+        },
+      };
+
+      const serviceWithMetrics = new CircuitBreakerService(undefined, mockMetricsService as any);
+      
+      // Set state to CLOSED
+      const metrics: CircuitBreakerMetrics = {
+        failureCount: 0,
+        successCount: 0,
+        lastFailureTime: null,
+        state: CircuitBreakerState.CLOSED,
+        lastStateChangeTime: Date.now(),
+      };
+
+      // Manually update metrics to trigger Prometheus update
+      (serviceWithMetrics as any).updateMetrics('test-provider', metrics);
+
+      expect(mockMetricsService.circuitBreakerState.set).toHaveBeenCalledWith(
+        { provider: 'test-provider' },
+        0 // CLOSED = 0
+      );
     });
   });
 

@@ -6,6 +6,7 @@ import {
 import { CircuitBreakerService } from '../../circuit-breaker/CircuitBreakerService';
 import { CircuitBreakerConfig } from '../../circuit-breaker/CircuitBreakerStrategy';
 import { KafkaService } from '../../kafka/kafka.service';
+import { MetricsService } from '../../metrics/metrics.service';
 import { Logger } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -16,14 +17,15 @@ export class PushProviderService2 extends BaseProviderService {
 
   constructor(
     circuitBreakerService: CircuitBreakerService,
-    kafkaService?: KafkaService,
-    circuitBreakerConfig?: Partial<CircuitBreakerConfig>
+    kafkaService: KafkaService,
+    circuitBreakerConfig: Partial<CircuitBreakerConfig>,
+    metricsService: MetricsService
   ) {
     super(circuitBreakerService, kafkaService, {
       failureThreshold: 3, // Different threshold for this provider
       timeout: 45000,
       ...circuitBreakerConfig,
-    });
+    }, metricsService);
   }
 
   protected getRequest(payload: NotificationPayload): Record<string, any> {

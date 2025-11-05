@@ -12,22 +12,37 @@ A notification service built with NestJS, PostgreSQL, and Kafka that handles mul
 - **Template Rendering**: Dynamic template rendering with variable substitution
 - **Message Deduplication**: Prevents duplicate processing
 - **Comprehensive Logging**: Delivery logs and provider request/response tracking
+- **Prometheus Metrics**: Comprehensive monitoring metrics exposed via `/metrics` endpoint
 
 ## Architecture
 
 ```
-API → Kafka (notification) → Notification Worker → Kafka (notification.push/email)
-                                                    ↓
-                                         Push/Email Workers → Providers
-                                                    ↓
-                                         Delivery Logs + Provider Responses
+Internal Services
+    ↓
+Notification API (Validates Payload, Renders Templates)
+    ↓
+Kafka Topic: notification (with pre-rendered templates)
+    ↓
+Splitter Worker (Deduplication via LRU Cache & Channel Routing)
+    ↓
+Kafka Topics: notification.email, notification.push (individual ChannelMessages)
+    ↓
+Email Worker / Push Worker (Provider Failover with Circuit Breaker)
+    ↓
+External Providers (Email/Push Services)
+    ↓
+Kafka Topics:
+    - delivery_logs (all stages: routing, provider calls, failures)
+    - provider_request_response (detailed provider API interactions)
+    ↓
+PostgreSQL Database (via Kafka Connector for event sourcing)
 ```
 
 ## Quick Start
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
+- Node.js (v24.0.2 or higher recommended)
 - Docker and Docker Compose
 - npm or yarn
 
@@ -39,27 +54,137 @@ cd notification-services
 npm install
 ```
 
-### 2. Start Infrastructure
+### 2. Start All Services with Docker Compose
+
+**Option A: Run Everything with One Command (Recommended for Quick Start)**
+
+```bash
+docker-compose up -d
+```
+
+This builds the application images (if needed) and starts all services in one command:
+- **Infrastructure**: PostgreSQL (port 5432), Zookeeper (port 2181), Kafka (ports 9092, 29092)
+- **Application**: Notification API (port 3000), Splitter Worker, Email Worker, Push Worker, DLQ Replay Worker
+
+**Note:** The first time you run this, Docker will build the application images using the multi-stage Dockerfile (Node.js 24.0.2). This may take a few minutes. Subsequent runs will be faster.
+
+**Data Persistence:** This setup includes persistent volumes (`postgres_data`) for PostgreSQL, so your data will persist across container restarts. Use `docker-compose down -v` to remove volumes and start fresh.
+
+Migrations run automatically when PostgreSQL starts.
+
+**Option B: Run Infrastructure and Application Separately**
+
+**Step 1: Start Infrastructure Services**
 
 ```bash
 docker-compose -f docker-compose-infra.yml up -d
 ```
 
 This starts:
-- PostgreSQL (port 5432)
-- Zookeeper (port 2181)
-- Kafka (port 29092)
+- **PostgreSQL** (port 5432) - Database migrations run automatically
+- **Zookeeper** (port 2181) - Required for Kafka coordination
+- **Kafka** (ports 9092, 29092) - Message broker for event streaming
 
-Migrations run automatically when PostgreSQL starts.
+**Note:** Infrastructure services use persistent volumes for data. Stop with `docker-compose -f docker-compose-infra.yml down` (without `-v`) to preserve data, or `down -v` to remove volumes.
 
-### 3. Start Services
+**Step 2: Start Application Services**
 
-#### Option A: Start All Services
+```bash
+docker-compose -f docker-compose-application.yml up -d
+```
+
+This builds the application images (if needed) and starts:
+- **Notification API** (port 3000)
+- **Splitter Worker**
+- **Email Worker**
+- **Push Worker**
+- **DLQ Replay Worker**
+
+**Note:** Make sure the infrastructure services are running first. The application services connect to the infrastructure via the shared `notifications-network` Docker network.
+
+**Useful Commands:**
+
+**Check service status:**
+```bash
+# For all-in-one setup
+docker-compose ps
+
+# For separate setup
+docker-compose -f docker-compose-application.yml ps
+```
+
+**View logs:**
+```bash
+# All services (all-in-one)
+docker-compose logs -f
+
+# All services (separate)
+docker-compose -f docker-compose-application.yml logs -f
+
+# Specific service
+docker-compose logs -f notification-api
+docker-compose logs -f splitter-worker
+```
+
+**Stop all services:**
+```bash
+# For all-in-one setup
+docker-compose down
+
+# For separate setup
+docker-compose -f docker-compose-application.yml down
+docker-compose -f docker-compose-infra.yml down
+```
+
+**Stop and remove volumes:**
+```bash
+# For all-in-one setup
+docker-compose down -v
+
+# For separate setup
+docker-compose -f docker-compose-application.yml down -v
+docker-compose -f docker-compose-infra.yml down -v
+```
+
+**Rebuild application images:**
+```bash
+# Force rebuild (useful after code changes)
+docker-compose build --no-cache
+
+# Or for separate setup
+docker-compose -f docker-compose-application.yml build --no-cache
+```
+
+**Note:** Kafka healthcheck settings differ between compose files:
+- `docker-compose.yml`: 120-second start period, 20 retries, 15-second timeout (more lenient for all-in-one setup)
+- `docker-compose-infra.yml`: 60-second start period, 10 retries, 10-second timeout (standard setup)
+Kafka may take time to become healthy on first startup as it loads metadata.
+
+### 3. Start Services Manually (Alternative)
+
+If you prefer to run services manually without Docker:
+
+#### Step 1: Start Infrastructure Only
+
+```bash
+docker-compose -f docker-compose-infra.yml up -d
+```
+
+This starts:
+- **PostgreSQL** (port 5432) - Database migrations run automatically
+- **Zookeeper** (port 2181) - Required for Kafka coordination
+- **Kafka** (ports 9092, 29092) - Message broker for event streaming
+
+**Note:** This infrastructure setup doesn't use persistent volumes (data is ephemeral). For persistent data, use `docker-compose.yml` which includes the `postgres_data` volume.
+
+#### Step 2: Start Application Services
+
+**Option A: Start All Services**
 ```bash
 npm run start:all
 ```
 
-#### Option B: Start Individually
+**Option B: Start Individually**
 ```bash
 # Terminal 1: API
 npm run start:api
@@ -80,8 +205,24 @@ The API runs on port 3000 by default (configurable via `API_PORT` environment va
 
 **Health Check:**
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:3000/notifications/health
 ```
+
+**Metrics Endpoint:**
+```bash
+curl http://localhost:3000/metrics
+```
+
+The metrics endpoint exposes Prometheus-compatible metrics for monitoring:
+- Notification API request metrics (duration, count, status)
+- Worker processing metrics (duration, count, status)
+- Provider API metrics (duration, count, status)
+- Circuit breaker state
+- Kafka publish/consume metrics
+- Database query metrics
+- DLQ replay metrics
+
+**Note:** The `/metrics` endpoint is Prometheus-compatible and can be scraped by any Prometheus instance. Prometheus is not included in the Docker Compose setup by default, but you can configure your own Prometheus instance to scrape from `http://localhost:3000/metrics` if needed.
 
 **Send a notification:**
 ```bash
@@ -138,7 +279,7 @@ For detailed e2e test setup and troubleshooting, see [src/test/README.md](src/te
 # Run all tests (unit + e2e)
 npm run test:all
 
-# Run with coverage currently minimum threshold's set to 90% (unit tests only)
+# Run with coverage (minimum thresholds: 90% for all metrics)
 npm run test:cov
 
 # Run in watch mode (unit tests only)
@@ -163,6 +304,7 @@ notification-services/
 │   ├── kafka/                      # Kafka configuration and types
 │   ├── cache/                      # In-memory cache service
 │   ├── circuit-breaker/            # Circuit breaker implementation
+│   ├── metrics/                    # Prometheus metrics collection
 │   └── test/                       # Test utilities
 │   └── **/*.spec.ts                # Unit tests
 ├── e2e/                            # End-to-end tests
@@ -172,7 +314,10 @@ notification-services/
 ├── scripts/                        # Utility scripts
 ├── jest.config.js                 # Jest config for unit tests
 ├── jest.e2e.config.js              # Jest config for e2e tests
-└── docker-compose-infra.yml        # Infrastructure services
+├── Dockerfile                      # Multi-stage Dockerfile (Node.js 24.0.2)
+├── docker-compose.yml              # All services (infrastructure + application) with persistent volumes
+├── docker-compose-infra.yml        # Infrastructure services only (ephemeral data, no persistent volumes)
+└── docker-compose-application.yml   # Application services only (requires infrastructure network)
 ```
 
 ## Available Scripts

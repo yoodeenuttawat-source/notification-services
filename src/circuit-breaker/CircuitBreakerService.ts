@@ -6,6 +6,7 @@ import {
   CircuitBreakerStrategy,
 } from './CircuitBreakerStrategy';
 import { DefaultCircuitBreakerStrategy } from './DefaultCircuitBreakerStrategy';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class CircuitBreakerService {
@@ -13,7 +14,10 @@ export class CircuitBreakerService {
   private strategies: Map<string, CircuitBreakerStrategy> = new Map();
   private defaultConfig: CircuitBreakerConfig;
 
-  constructor(@Optional() defaultConfig?: CircuitBreakerConfig) {
+  constructor(
+    @Optional() defaultConfig?: CircuitBreakerConfig,
+    @Optional() private readonly metricsService?: MetricsService
+  ) {
     this.defaultConfig = defaultConfig || {
       failureThreshold: 5,
       successThreshold: 3,
@@ -135,6 +139,13 @@ export class CircuitBreakerService {
    */
   private updateMetrics(providerName: string, newMetrics: CircuitBreakerMetrics): void {
     this.metrics.set(providerName, newMetrics);
+    
+    // Update Prometheus metrics
+    if (this.metricsService) {
+      const stateValue = newMetrics.state === CircuitBreakerState.CLOSED ? 0 :
+                         newMetrics.state === CircuitBreakerState.OPEN ? 1 : 2; // HALF_OPEN
+      this.metricsService.circuitBreakerState.set({ provider: providerName }, stateValue);
+    }
   }
 
   /**

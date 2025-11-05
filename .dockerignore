@@ -1,0 +1,36 @@
+node_modules
+npm-debug.log
+dist
+coverage
+.git
+.gitignore
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+*.md
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Test files
+*.spec.ts
+*.e2e.spec.ts
+e2e
+jest.config.js
+jest.e2e.config.js
+
+# Documentation
+README.md
+SYSTEMDESIGN.MD
+SystemDesign.txt
+SystemDesign.png
+
+# Docker files (to avoid recursion)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+

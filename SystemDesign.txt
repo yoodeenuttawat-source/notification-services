@@ -4,11 +4,12 @@ Data flow
 3. Splitter worker consume message and check if message is duplicated or not. if it's duplicated then we skip this message otherwise we process message normally and then split message based on supported channels (email, push) then publish to email topic and push topic and publish each channel to delivery_logs
 4. Email worker and Push worker consume the message and get list of available providers sorted by priority then call provider api in the order of priority if the first one is not successful. every provider api calls we send event to provider_request_response topic and send status to delivery_logs
 5. if any worker process the message and it failed. we will separate to 2 types of messages. retryable and non-retryable. for retryable we will publish to dlq and for non-retryable do the same thing but don't send to dlq
-6. Kafka connector will subscribe all topics to build the table from events
+6. if any kafka message failed to send. We will write it to the disk and let a separate process to read from disk and resend to kafka (work when we have our own node/server)
+7. Kafka connector will subscribe all topics to build the table from events
 
 
 Assumption
-1. We want system to be scalable and handle 100k Notification per minute = 1667 Notification per second and focus on Reliability so we have 2 options to use outbox pattern or event sourcing so it can achieve this in one transaction but outbox pattern has limitation on database. I decide to do event sourcing instead because the bottleneck will be kafka which support high throughput
+1. We want system to be scalable and handle 100k Notification per minute = 1667 Notification per second and focus on Reliability so I decide to use Kafka as main backbone of the system and we are allowed to have duplicated notification in some edge case
 2. Assume that all providers support idempotent key so we can retry multiple times without worrying on user getting duplicate notification
 3. Assume that when we call provider they response 'sent' instantly so we don't need to care about webhook/callback stuff
 4. Assume that we can ignore 'read', 'click' status to reduce the scope of the designs
@@ -20,13 +21,13 @@ Assumption
 
 
 Prometheus Metrics
-1. provider api call (success rate/ latency)
-2. circuit breaker status
-3. notfication api (request per minutes / latency / sucess rate)
-4. kafka (kafka success rate per topic/ response time per topic)
-5. database latency / success rate
-7. dlq message count / processing rate
-9. worker processing time / success rate
+1. provider api call (success rate/ latency) (alert when p95 exceed XXXms, success rate drop below 99%)
+2. circuit breaker status (open / close) (alert when open)
+3. notfication api (request per minutes / latency / sucess rate) (alert when p95 exceed XXXms, success rate drop below 99%)
+4. kafka (kafka success rate per topic/ response time per topic) (alert when kafka success rate drop below 100%, p95response time exceed XXXms)
+5. database latency / success rate (alert when p95 exceed XXXms, success rate drop below 100%)
+7. dlq message count / processing rate (alert when dlq message count exceed XXX)
+9. worker processing time / success rate (alert when p95 exceed XXXms, success rate drop below 99%)
 
 Infra Metrics
 1. cpu / memory / disk / network for each service
@@ -34,9 +35,11 @@ Infra Metrics
 3. Database connections / cpu / memory / disk / network
 4. API gateway latency / success rate
 
+Configuration is in migrations folder
+
 Unit test coverage
 line 90%
-branch 89.5%
+branch 90%
 yarn test:cov
 
 Integration test

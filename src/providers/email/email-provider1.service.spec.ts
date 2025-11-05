@@ -3,12 +3,14 @@ import { EmailProviderService1 } from './email-provider1.service';
 import { CircuitBreakerService } from '../../circuit-breaker/CircuitBreakerService';
 import { CircuitBreakerOpenError } from '../../circuit-breaker/CircuitBreakerOpenError';
 import { KafkaService } from '../../kafka/kafka.service';
+import { MetricsService } from '../../metrics/metrics.service';
 import { KAFKA_TOPICS } from '../../kafka/kafka.config';
 
 describe('EmailProviderService1', () => {
   let service: EmailProviderService1;
   let circuitBreakerService: CircuitBreakerService;
   let kafkaService: KafkaService;
+  let metricsService: MetricsService;
 
   const mockCircuitBreakerService = {
     shouldAllowRequest: jest.fn().mockReturnValue(true),
@@ -19,6 +21,12 @@ describe('EmailProviderService1', () => {
 
   const mockKafkaService = {
     publishMessage: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockMetricsService = {
+    providerApiMetrics: {
+      startTimer: jest.fn().mockReturnValue(() => 0.1),
+    },
   };
 
   beforeEach(async () => {
@@ -39,11 +47,19 @@ describe('EmailProviderService1', () => {
           useValue: mockKafkaService,
         },
         {
+          provide: MetricsService,
+          useValue: mockMetricsService,
+        },
+        {
           provide: EmailProviderService1,
-          useFactory: (circuitBreaker: CircuitBreakerService, kafka?: KafkaService) => {
-            return new EmailProviderService1(circuitBreaker, kafka);
+          useFactory: (
+            circuitBreaker: CircuitBreakerService,
+            kafka: KafkaService,
+            metrics: MetricsService
+          ) => {
+            return new EmailProviderService1(circuitBreaker, kafka, {}, metrics);
           },
-          inject: [CircuitBreakerService, KafkaService],
+          inject: [CircuitBreakerService, KafkaService, MetricsService],
         },
       ],
     }).compile();
@@ -51,6 +67,7 @@ describe('EmailProviderService1', () => {
     service = module.get<EmailProviderService1>(EmailProviderService1);
     circuitBreakerService = module.get<CircuitBreakerService>(CircuitBreakerService);
     kafkaService = module.get<KafkaService>(KafkaService);
+    metricsService = module.get<MetricsService>(MetricsService);
 
     jest.clearAllMocks();
   });
@@ -206,28 +223,6 @@ describe('EmailProviderService1', () => {
       );
     });
 
-    it('should not publish to Kafka when kafkaService is not available', async () => {
-      // Create service without KafkaService
-      const serviceWithoutKafka = new EmailProviderService1(circuitBreakerService);
-
-      const payload = {
-        recipient: 'test@example.com',
-        subject: 'Test Subject',
-        content: 'Test Content',
-        context: {
-          notification_id: 'test-123',
-          event_id: 1,
-          event_name: 'TEST',
-          channel_id: 1,
-          channel_name: 'EMAIL',
-        },
-      };
-
-      const result = await serviceWithoutKafka.sendNotification(payload);
-
-      expect(result.success).toBe(true);
-      expect(kafkaService.publishMessage).not.toHaveBeenCalled();
-    });
 
     it('should not publish to Kafka when context is missing', async () => {
       const payload = {
@@ -247,52 +242,6 @@ describe('EmailProviderService1', () => {
       expect(providerResponseCalls.length).toBe(0);
     });
 
-    it('should not publish provider response when kafkaService is missing in error case', async () => {
-      const serviceWithoutKafka = new EmailProviderService1(circuitBreakerService);
-
-      const payload = {
-        recipient: 'test@example.com',
-        content: 'Test Content', // Missing subject
-        context: {
-          notification_id: 'test-123',
-          event_id: 1,
-          event_name: 'TEST',
-          channel_id: 1,
-          channel_name: 'EMAIL',
-        },
-      };
-
-      await expect(serviceWithoutKafka.sendNotification(payload)).rejects.toThrow();
-
-      // Should not publish without kafkaService
-      expect(kafkaService.publishMessage).not.toHaveBeenCalled();
-    });
-
-    it('should not publish delivery log when kafkaService is missing', async () => {
-      const serviceWithoutKafka = new EmailProviderService1(circuitBreakerService);
-
-      const payload = {
-        recipient: 'test@example.com',
-        subject: 'Test Subject',
-        content: 'Test Content',
-        context: {
-          notification_id: 'test-123',
-          event_id: 1,
-          event_name: 'TEST',
-          channel_id: 1,
-          channel_name: 'EMAIL',
-        },
-      };
-
-      const result = await serviceWithoutKafka.sendNotification(payload);
-
-      expect(result.success).toBe(true);
-      // Should not publish delivery log without kafkaService
-      const deliveryLogCalls = (kafkaService.publishMessage as jest.Mock).mock.calls.filter(
-        (call) => call[0] === KAFKA_TOPICS.DELIVERY_LOGS
-      );
-      expect(deliveryLogCalls.length).toBe(0);
-    });
   });
 
   describe('getRequest', () => {

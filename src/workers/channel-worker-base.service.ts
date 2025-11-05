@@ -6,6 +6,7 @@ import { ChannelMessage } from '../kafka/types/channel-message';
 import { BaseWorkerService } from './base-worker.service';
 import { KafkaService } from '../kafka/kafka.service';
 import { CacheService } from '../cache/cache.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 /**
  * Base class for channel-specific workers (email, push)
@@ -13,13 +14,14 @@ import { CacheService } from '../cache/cache.service';
  */
 export abstract class ChannelWorkerBaseService extends BaseWorkerService {
   constructor(
-    protected readonly kafkaService: KafkaService,
-    protected readonly cacheService: CacheService,
+    kafkaService: KafkaService,
+    cacheService: CacheService,
     protected readonly configService: ConfigService,
     protected readonly providerFactory: ProviderFactoryService,
-    loggerName: string
+    loggerName: string,
+    metricsService: MetricsService
   ) {
-    super(kafkaService, cacheService, loggerName);
+    super(kafkaService, cacheService, loggerName, metricsService);
   }
 
   /**

@@ -4,16 +4,17 @@ import { CacheService } from '../cache/cache.service';
 import { KAFKA_TOPICS } from '../kafka/kafka.config';
 import { DeliveryLog } from '../kafka/types/delivery-log';
 import { DLQMessage } from '../kafka/types/dlq-message';
-import { EachMessagePayload } from 'kafkajs';
+import { MetricsService } from '../metrics/metrics.service';
 
 export abstract class BaseWorkerService {
   protected readonly logger: Logger;
   protected readonly DEDUP_TTL_SECONDS = 120; // 2 minutes
 
   constructor(
-    protected readonly kafkaService: KafkaService,
-    protected readonly cacheService: CacheService,
-    loggerName: string
+    protected kafkaService: KafkaService,
+    protected cacheService: CacheService,
+    protected loggerName: string,
+    protected metricsService: MetricsService
   ) {
     this.logger = new Logger(loggerName);
   }

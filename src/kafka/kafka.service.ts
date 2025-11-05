@@ -1,6 +1,7 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Optional } from '@nestjs/common';
 import { Kafka, Producer, Consumer, EachMessagePayload, Partitioners } from 'kafkajs';
 import { getKafkaConfig } from './kafka.config';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class KafkaService implements OnModuleInit, OnModuleDestroy {
@@ -9,7 +10,7 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
   private producer: Producer;
   private consumers: Map<string, Consumer> = new Map();
 
-  constructor() {
+  constructor(@Optional() private readonly metricsService?: MetricsService) {
     const config = getKafkaConfig();
     this.kafka = new Kafka(config);
     this.producer = this.kafka.producer({
@@ -41,6 +42,8 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
     topic: string,
     messages: Array<{ key?: string; value: T }>
   ): Promise<void> {
+    const timer = this.metricsService?.kafkaPublishMetrics.startTimer({ topic, status: 'success' });
+    
     try {
       await this.producer.send({
         topic,
@@ -49,9 +52,14 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
           value: JSON.stringify(msg.value),
         })),
       });
+      
       this.logger.debug(`Published ${messages.length} message(s) to topic: ${topic}`);
+      timer?.();
     } catch (error) {
+      timer?.(); // Stop success timer
+      const errorTimer = this.metricsService?.kafkaPublishMetrics.startTimer({ topic, status: 'failure' });
       this.logger.error(`Failed to publish message to topic ${topic}:`, error);
+      errorTimer?.();
       throw error;
     }
   }
@@ -80,14 +88,23 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
    */
   async consumeMessages(
     consumer: Consumer,
-    handler: (payload: EachMessagePayload) => Promise<void>
+    handler: (payload: EachMessagePayload) => Promise<void>,
+    topic?: string,
+    consumerGroup?: string
   ): Promise<void> {
     await consumer.run({
       eachMessage: async (payload) => {
+        const timer = this.metricsService?.kafkaConsumeMetrics.startTimer({
+          topic: topic || payload.topic,
+          consumer_group: consumerGroup || 'unknown',
+        });
+        
         try {
           await handler(payload);
+          timer?.();
         } catch (error) {
           this.logger.error('Error processing message:', error);
+          timer?.();
           // You might want to handle errors differently (DLQ, retry, etc.)
         }
       },
