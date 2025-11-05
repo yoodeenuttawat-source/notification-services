@@ -9,7 +9,7 @@ Data flow
 
 
 Assumption
-1. We want system to be scalable and handle 100k Notification per minute = 1667 Notification per second and focus on Reliability so we have 2 options to use outbox pattern or event sourcing so it can achieve this in one transaction but outbox pattern has limitation on database. I decide to do event sourcing instead because the bottleneck will be kafka which support high throughput
+1. We want system to be scalable and handle 100k Notification per minute = 1667 Notification per second and focus on Reliability so I decide to use Kafka as main backbone of the system and we are allowed to have duplicated notification in some edge case
 2. Assume that all providers support idempotent key so we can retry multiple times without worrying on user getting duplicate notification
 3. Assume that when we call provider they response 'sent' instantly so we don't need to care about webhook/callback stuff
 4. Assume that we can ignore 'read', 'click' status to reduce the scope of the designs
